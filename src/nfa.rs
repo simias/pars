@@ -1,9 +1,11 @@
+//! Nondeterministic Finite Automaton (NFA) implementation.
+
 use std::collections::{HashMap, VecDeque};
 use std::fmt;
 
 /// An `Option`-like enum holding a state transition
 #[derive(PartialEq, Eq, Copy, Clone, Debug, Hash)]
-enum Transition {
+pub enum Transition {
     /// Transition on some input character
     Input(char),
     /// ε-transition, doens't consume any input
@@ -12,7 +14,7 @@ enum Transition {
 
 use self::Transition::{Input, Epsilon};
 
-/// Nondeterministic finite automaton (NFA) implementation.
+/// NFA state
 pub struct Nfa {
     /// Vector of states. Each state contains a `HashMap` to lookup
     /// the next possible states for any input character (or `None`
@@ -161,6 +163,47 @@ impl Nfa {
         state_0.insert(Epsilon, vec![1, self.states.len() as isize]);
 
         self.states.push_front(state_0);
+    }
+
+    /// Returns a `Vec` of states that are reachable from `states`
+    /// using ε-transitions alone.
+    pub fn epsilon_closure(&self, states: &[usize]) -> Vec<usize> {
+        let mut epsi_states = Vec::new();
+
+        // Any state can ε-transition to itself
+        epsi_states.extend(states);
+
+        // A stack used to track all the states that remain to be
+        // visited since we want to travel ε-transitions recursively.
+        let mut remaining_states = epsi_states.clone();
+
+        while let Some(state) = remaining_states.pop() {
+            let transitions = self.transitions(state, Epsilon);
+
+            for t in transitions {
+                let next_state = (state as isize + t) as usize;
+
+                if epsi_states.iter().find(|&&s| s == next_state).is_none() {
+                    // We found a new state for the ε-closure
+                    epsi_states.push(next_state);
+                    remaining_states.push(next_state);
+                }
+            }
+        }
+
+        epsi_states
+    }
+
+    /// Returns the list of state *offsets* from `state` reachable
+    /// through a transition using `input`.
+    pub fn transitions(&self, state: usize, input: Transition) -> &[isize] {
+        if let Some(state) = self.states.get(state) {
+            if let Some(ref trans) = state.get(&input) {
+                return trans
+            }
+        }
+
+        &[]
     }
 }
 

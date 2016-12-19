@@ -1,6 +1,7 @@
-extern crate flexr;
+extern crate pars;
 
-use flexr::nfa::Nfa;
+use pars::nfa::Nfa;
+use pars::dfa::Dfa;
 
 fn main() {
     // (a|b)c*d
@@ -12,6 +13,8 @@ fn main() {
 
     nfa.concat(c_star);
     nfa.concat(Nfa::new('d'));
+
+    let dfa = Dfa::from_nfa(&nfa);
 
     println!("{:?}", nfa);
 }
