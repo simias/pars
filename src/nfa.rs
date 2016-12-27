@@ -3,18 +3,57 @@
 use std::collections::{HashMap, VecDeque};
 use std::fmt;
 
-/// An `Option`-like enum holding a state transition
-#[derive(PartialEq, Eq, Copy, Clone, Debug, Hash)]
-pub enum Transition {
-    /// Transition on some input character
-    Input(char),
-    /// ε-transition, doens't consume any input
-    Epsilon,
+/// NFA state
+struct State {
+    /// Map of all valid moves from this state. The target state is
+    /// stored as a signed offset in the
+    moves: HashMap<Transition, Vec<isize>>,
+    /// `None` if the state is non-accepting
+    accepting: Option<String>,
 }
 
-use self::Transition::{Input, Epsilon};
+impl State {
+    /// Creates a new non-accepting state with no moves
+    fn new() -> State {
+        State {
+            moves: HashMap::new(),
+            accepting: None,
+        }
+    }
 
-/// NFA state
+
+    /// Creates a new accepting state with no moves
+    fn new_accepting(desc: String) -> State {
+        State {
+            moves: HashMap::new(),
+            accepting: Some(desc),
+        }
+    }
+
+    fn accepting(&self) -> Option<String> {
+        self.accepting.clone()
+    }
+
+    /// Set the moves on `input`. Any previous moves on `input` are
+    /// discarded.
+    fn set_moves(&mut self, input: Transition, targets: Vec<isize>) {
+        self.moves.insert(input, targets);
+    }
+
+    /// Returns the moves on `input`
+    fn get_moves(&self, input: Transition) -> &[isize] {
+        match self.moves.get(&input) {
+            Some(v) => v,
+            None => &[],
+        }
+    }
+
+    fn move_map(&self) -> &HashMap<Transition, Vec<isize>> {
+        &self.moves
+    }
+}
+
+/// NFA graph
 pub struct Nfa {
     /// Vector of states. Each state contains a `HashMap` to lookup
     /// the next possible states for any input character (or `None`
@@ -36,7 +75,7 @@ pub struct Nfa {
     /// it makes implementing concatenations easier. That means that
     /// states that transition into the final state point one past the
     /// last element.
-    states: VecDeque<HashMap<Transition, Vec<isize>>>,
+    states: VecDeque<State>,
 }
 
 impl Nfa {
@@ -47,13 +86,31 @@ impl Nfa {
     /// (0) ------> (f)
     /// ```
     pub fn new(c: char) -> Nfa {
-        let mut map = HashMap::new();
+        let mut state = State::new();
 
-        map.insert(Input(c), vec![1]);
+        state.set_moves(Input(c), vec![1]);
 
         let mut states = VecDeque::new();
 
-        states.push_back(map);
+        states.push_back(state);
+
+        Nfa {
+            states: states,
+        }
+    }
+
+    /// Create a new NFA with a single accepting state having no
+    /// transitions
+    ///
+    /// ```text
+    /// ((0))
+    /// ```
+    pub fn new_accepting(desc: String) -> Nfa {
+        let state = State::new_accepting(desc);
+
+        let mut states = VecDeque::new();
+
+        states.push_back(state);
 
         Nfa {
             states: states,
@@ -101,33 +158,32 @@ impl Nfa {
 
         // First let's create the previous final state of `other` ((4)
         // above) which will transition into the new final state
-        let mut state_4 = HashMap::new();
+        let mut state_4 = State::new();
 
         // We're going to put the new final state at the end (as usual).
-        state_4.insert(Epsilon, vec![1]);
+        state_4.set_moves(Epsilon, vec![1]);
 
         other.states.push_back(state_4);
 
         // Next let's do the same thing for `self`
-        let mut state_2 = HashMap::new();
+        let mut state_2 = State::new();
 
         // We're going to append `other`'s state to `self.state` so we
         // need to compute the index accordingly.
-        state_2.insert(Epsilon, vec![other.states.len() as isize + 1]);
+        state_2.set_moves(Epsilon, vec![other.states.len() as isize + 1]);
 
         self.states.push_back(state_2);
 
         // We also need to create state (0) which just ε-transitions
         // into the two previous NFAs
-        let mut state_0 = HashMap::new();
+        let mut state_0 = State::new();
 
-        state_0.insert(Epsilon,
-                       vec![
-                           // points to (1)
-                           1,
-                           // points to (3)
-                           self.states.len() as isize + 1]);
-
+        state_0.set_moves(Epsilon,
+                         vec![
+                             // points to (1)
+                             1,
+                             // points to (3)
+                             self.states.len() as isize + 1]);
 
         self.states.push_front(state_0);
 
@@ -151,16 +207,16 @@ impl Nfa {
     pub fn star(&mut self) {
         // Create state (2) and have it point at the new final state
         // (f) and the current first state (1)
-        let mut state_2 = HashMap::new();
+        let mut state_2 = State::new();
 
-        state_2.insert(Epsilon, vec![1, -(self.states.len() as isize)]);
+        state_2.set_moves(Epsilon, vec![1, -(self.states.len() as isize)]);
 
         self.states.push_back(state_2);
 
         // Create state (0) pointing at (1) and (f)
-        let mut state_0 = HashMap::new();
+        let mut state_0 = State::new();
 
-        state_0.insert(Epsilon, vec![1, self.states.len() as isize + 1]);
+        state_0.set_moves(Epsilon, vec![1, self.states.len() as isize + 1]);
 
         self.states.push_front(state_0);
     }
@@ -194,13 +250,14 @@ impl Nfa {
 
     /// Returns the list of states reachable through a transition
     /// from `state` using `input`.
-    pub fn transitions(&self, state: usize, input: Transition) -> Vec<usize> {
+    pub fn transitions(&self, state_idx: usize, input: Transition) -> Vec<usize> {
         let mut states = Vec::new();
 
-        if let Some(map) = self.states.get(state) {
-            if let Some(ref trans) = map.get(&input) {
-                states.extend(trans.iter().map(|off| (state as isize + off) as usize));
-            }
+        if let Some(state) = self.states.get(state_idx) {
+            let moves = state.get_moves(input);
+
+            states.extend(moves.iter()
+                          .map(|off| (state_idx as isize + off) as usize));
         }
 
         states
@@ -239,7 +296,7 @@ impl Nfa {
         for &s in states {
             if let Some(state) = self.states.get(s) {
 
-                for (transition, target) in state {
+                for (transition, target) in state.move_map() {
                     // We ignore ε-transitions
                     if let &Input(c) = transition {
                         let cur_states = m_s.entry(c).or_insert(Vec::new());
@@ -261,13 +318,26 @@ impl Nfa {
 
         m_s
     }
+
+    /// Returns `None` if `state_idx` is non-accepting
+    pub fn accepting(&self, state_idx: usize) -> Option<String> {
+        if let Some(state) = self.states.get(state_idx) {
+            state.accepting()
+        } else {
+            None
+        }
+    }
 }
 
 impl fmt::Debug for Nfa {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        for (state, transitions) in self.states.iter().enumerate() {
-            try!(write!(f, "({}):\n", state));
-            for (&transition, target) in transitions {
+        for (state_idx, state) in self.states.iter().enumerate() {
+            match state.accepting() {
+                Some(desc) => try!(writeln!(f, "(({})) `{}`:", state_idx, desc)),
+                None => try!(writeln!(f, "({}):", state_idx)),
+            }
+
+            for (&transition, target) in state.move_map() {
                 let transition =
                     match transition {
                         Input(c) => c,
@@ -276,7 +346,7 @@ impl fmt::Debug for Nfa {
 
                 try!(write!(f, "    {} ->", transition));
                 for t in target {
-                    try!(write!(f, " {}", state as isize + t));
+                    try!(write!(f, " {}", state_idx as isize + t));
                 }
                 try!(writeln!(f, ""));
             }
@@ -284,3 +354,14 @@ impl fmt::Debug for Nfa {
         Ok(())
     }
 }
+
+/// An `Option`-like enum holding a state transition
+#[derive(PartialEq, Eq, Copy, Clone, Debug, Hash)]
+pub enum Transition {
+    /// Transition on some input character
+    Input(char),
+    /// ε-transition, doens't consume any input
+    Epsilon,
+}
+
+use self::Transition::{Input, Epsilon};

@@ -14,6 +14,8 @@ fn main() {
     nfa.concat(Nfa::new('b'));
     nfa.concat(Nfa::new('b'));
 
+    nfa.concat(Nfa::new_accepting("got (a|b)*abb".into()));
+
     let dfa = Dfa::from_nfa(&nfa);
 
     println!("{:?}", nfa);
