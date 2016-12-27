@@ -55,26 +55,9 @@ impl State {
 
 /// NFA graph
 pub struct Nfa {
-    /// Vector of states. Each state contains a `HashMap` to lookup
-    /// the next possible states for any input character (or `None`
-    /// for ε-transitions). Stored as a double ended queue since we
-    /// might have to push new states to the front (for instance in
-    /// the case of unions).
-    ///
-    /// Since it's possible for an NFA to have multiple possible
-    /// transitions for a single input those transitions are stored in
-    /// a `Vec`.
-    ///
-    /// The state transitions themselves are stored as a signed offset
-    /// to the next state within the table. This way we can move those
-    /// states around or even copy them into an other table without
-    /// having to rewrite all the pointers.
-    ///
-    /// The final state of the NFA (denoted `(f)` in this file) is not
-    /// stored in the vector since it doesn't have any transition and
-    /// it makes implementing concatenations easier. That means that
-    /// states that transition into the final state point one past the
-    /// last element.
+    /// Vector of the states of the Nfa. Each state represents
+    /// transitions as signed indices pointing to the other states in
+    /// this vector.
     states: VecDeque<State>,
 }
 
