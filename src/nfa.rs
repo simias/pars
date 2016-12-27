@@ -181,12 +181,10 @@ impl Nfa {
             let transitions = self.transitions(state, Epsilon);
 
             for t in transitions {
-                let next_state = (state as isize + t) as usize;
-
-                if epsi_states.iter().find(|&&s| s == next_state).is_none() {
+                if epsi_states.iter().find(|&&s| s == t).is_none() {
                     // We found a new state for the ε-closure
-                    epsi_states.push(next_state);
-                    remaining_states.push(next_state);
+                    epsi_states.push(t);
+                    remaining_states.push(t);
                 }
             }
         }
@@ -194,16 +192,74 @@ impl Nfa {
         epsi_states
     }
 
-    /// Returns the list of state *offsets* from `state` reachable
-    /// through a transition using `input`.
-    pub fn transitions(&self, state: usize, input: Transition) -> &[isize] {
-        if let Some(state) = self.states.get(state) {
-            if let Some(ref trans) = state.get(&input) {
-                return trans
+    /// Returns the list of states reachable through a transition
+    /// from `state` using `input`.
+    pub fn transitions(&self, state: usize, input: Transition) -> Vec<usize> {
+        let mut states = Vec::new();
+
+        if let Some(map) = self.states.get(state) {
+            if let Some(ref trans) = map.get(&input) {
+                states.extend(trans.iter().map(|off| (state as isize + off) as usize));
             }
         }
 
-        &[]
+        states
+    }
+
+    /// Returns the ε-closure of all the states reachable by any non-ε
+    /// transition from any of the `states` provided.
+    ///
+    /// For instance, given the following NFA:
+    ///
+    /// ```text
+    ///       a           ε
+    ///   ,------> (2) ------> (3)
+    ///  /          \     b
+    /// (0)          `-------> (4)
+    ///  \    ε           c           ε
+    ///   `------> (1) ------> (5) --------.
+    ///             \     ε           d     v
+    ///              `-------> (6) ------> (7)
+    /// ```
+    ///
+    /// `get_move_set(&[0])` would return a `HashMap` containing a
+    /// single entry: `'a' -> [2, 3]`.
+    ///
+    /// `get_move_set(&[0, 1, 6])` (the ε-closure of state 0) would
+    /// return a `HashMap` with 3 entries:
+    ///
+    /// ```text
+    /// 'a' -> [2, 3]
+    /// 'c' -> [5, 7]
+    /// 'd' -> [7]
+    /// ```
+    pub fn get_move_set(&self, states: &[usize]) -> HashMap<char, Vec<usize>> {
+        let mut m_s = HashMap::new();
+
+        for &s in states {
+            if let Some(state) = self.states.get(s) {
+
+                for (transition, target) in state {
+                    // We ignore ε-transitions
+                    if let &Input(c) = transition {
+                        let cur_states = m_s.entry(c).or_insert(Vec::new());
+
+                        let s: Vec<_> =
+                            target.iter()
+                            .map(|off| (s as isize + off) as usize)
+                            .collect();
+
+                        let mut e_c = self.epsilon_closure(&s);
+
+                        cur_states.append(&mut e_c);
+                        cur_states.sort();
+                        cur_states.dedup();
+                    }
+                }
+            }
+        }
+
+        m_s
     }
 }
 
@@ -211,15 +267,15 @@ impl fmt::Debug for Nfa {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         for (state, transitions) in self.states.iter().enumerate() {
             try!(write!(f, "({}):\n", state));
-            for (&input, transition) in transitions {
-                let input =
-                    match input {
+            for (&transition, target) in transitions {
+                let transition =
+                    match transition {
                         Input(c) => c,
                         Epsilon => 'ε',
                     };
 
-                try!(write!(f, "    {} ->", input));
-                for t in transition {
+                try!(write!(f, "    {} ->", transition));
+                for t in target {
                     try!(write!(f, " {}", state as isize + t));
                 }
                 try!(writeln!(f, ""));
