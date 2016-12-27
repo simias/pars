@@ -160,7 +160,7 @@ impl Nfa {
         // Create state (0) pointing at (1) and (f)
         let mut state_0 = HashMap::new();
 
-        state_0.insert(Epsilon, vec![1, self.states.len() as isize]);
+        state_0.insert(Epsilon, vec![1, self.states.len() as isize + 1]);
 
         self.states.push_front(state_0);
     }
