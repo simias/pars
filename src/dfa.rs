@@ -4,8 +4,39 @@ use nfa::Nfa;
 use std::collections::HashMap;
 use std::fmt;
 
+struct State {
+    moves: HashMap<char, usize>,
+    accepting: Option<String>,
+}
+
+impl State {
+    /// Create a new non-accepting state with no moves
+    fn new() -> State {
+        State {
+            moves: HashMap::new(),
+            accepting: None,
+        }
+    }
+
+    /// Create a new accepting state with no moves
+    fn new_accepting(desc: String) -> State {
+        State {
+            moves: HashMap::new(),
+            accepting: Some(desc),
+        }
+    }
+
+    fn set_move(&mut self, input: char, target: usize) {
+        self.moves.insert(input, target);
+    }
+
+    fn move_map(&self) -> &HashMap<char, usize> {
+        &self.moves
+    }
+}
+
 pub struct Dfa {
-    states: Vec<HashMap<char, usize>>,
+    states: Vec<State>,
 }
 
 impl Dfa {
@@ -14,24 +45,43 @@ impl Dfa {
         // between each DFA state and the corresponding NFA states
         struct DState {
             nfa_states: Vec<usize>,
-            transitions: HashMap<char, usize>,
+            dfa_state: State,
         };
 
         impl DState {
-            fn from_nfa_states(mut n_s: Vec<usize>) -> DState {
+            fn from_nfa_states(nfa: &Nfa, mut n_s: Vec<usize>) -> DState {
                 n_s.sort();
                 n_s.dedup();
 
+                // Check if we have an accepting state
+                let mut accepting = None;
+
+                for &s in &n_s {
+                    if let Some(a) = nfa.accepting(s) {
+                        if let Some(p) = accepting {
+                            panic!("DFA state accepts two NFA states: {} and {}", p, a);
+                        }
+
+                        accepting = Some(a);
+                    }
+                }
+
+                let dfa_state =
+                    match accepting {
+                        Some(a) => State::new_accepting(a),
+                        None => State::new(),
+                    };
+
                 DState {
                     nfa_states: n_s,
-                    transitions: HashMap::new(),
+                    dfa_state: dfa_state,
                 }
             }
         }
 
         // We start from ε-closure of state (0) of the NFA and work
         // our way through recursively.
-        let mut dfa_states = vec![DState::from_nfa_states(nfa.epsilon_closure(&[0]))];
+        let mut dfa_states = vec![DState::from_nfa_states(nfa, nfa.epsilon_closure(&[0]))];
 
         let mut cur_state = 0;
 
@@ -50,12 +100,12 @@ impl Dfa {
                         Some((pos, _)) => pos,
                         None => {
                             // Create a new DFA state
-                            dfa_states.push(DState::from_nfa_states(states.clone()));
+                            dfa_states.push(DState::from_nfa_states(nfa, states.clone()));
                             dfa_states.len() - 1
                         }
                     };
 
-                dfa_states[cur_state].transitions.insert(transition, target);
+                dfa_states[cur_state].dfa_state.set_move(transition, target);
             }
 
             cur_state += 1;
@@ -64,16 +114,19 @@ impl Dfa {
         // The conversion is done, we can drop the NFA states
         // altogether
         Dfa {
-            states: dfa_states.into_iter().map(|s| s.transitions).collect()
+            states: dfa_states.into_iter().map(|s| s.dfa_state).collect()
         }
     }
 }
 
 impl fmt::Debug for Dfa {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        for (state, transitions) in self.states.iter().enumerate() {
-            try!(writeln!(f, "({}):", state));
-            for (c, target) in transitions {
+        for (state_idx, state) in self.states.iter().enumerate() {
+            match state.accepting {
+                Some(ref a) => try!(writeln!(f, "(({})) `{}`:", state_idx, a)),
+                None => try!(writeln!(f, "({}):", state_idx)),
+            }
+            for (c, target) in state.move_map() {
                 try!(writeln!(f, "  {} -> {}", c, target));
             }
         }
