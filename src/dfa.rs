@@ -59,7 +59,12 @@ impl Dfa {
                 for &s in &n_s {
                     if let Some(a) = nfa.accepting(s) {
                         if let Some(p) = accepting {
-                            panic!("DFA state accepts two NFA states: {} and {}", p, a);
+                            // XXX should have a priority paremeter
+                            // here (I believe the rule in lex is that
+                            // the first rule in the file takes
+                            // precedence in this case)
+                            panic!("DFA state has two accepting NFA states: \
+                                    {} and {}", p, a);
                         }
 
                         accepting = Some(a);
@@ -81,7 +86,8 @@ impl Dfa {
 
         // We start from ε-closure of state (0) of the NFA and work
         // our way through recursively.
-        let mut dfa_states = vec![DState::from_nfa_states(nfa, nfa.epsilon_closure(&[0]))];
+        let epsi_0 = nfa.epsilon_closure(&[0]);
+        let mut dfa_states = vec![DState::from_nfa_states(nfa, epsi_0)];
 
         let mut cur_state = 0;
 
@@ -100,7 +106,10 @@ impl Dfa {
                         Some((pos, _)) => pos,
                         None => {
                             // Create a new DFA state
-                            dfa_states.push(DState::from_nfa_states(nfa, states.clone()));
+                            let states = states.clone();
+
+                            dfa_states.push(DState::from_nfa_states(nfa,
+                                                                    states));
                             dfa_states.len() - 1
                         }
                     };

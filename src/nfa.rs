@@ -40,6 +40,14 @@ impl State {
         self.moves.insert(input, targets);
     }
 
+    /// Add a moves on `input`.
+    fn add_move(&mut self, input: Transition, target: isize) {
+        let m = self.moves.entry(input).or_insert(Vec::new());
+
+        m.push(target)
+    }
+
+
     /// Returns the moves on `input`
     fn get_moves(&self, input: Transition) -> &[isize] {
         match self.moves.get(&input) {
@@ -202,6 +210,44 @@ impl Nfa {
         state_0.set_moves(Epsilon, vec![1, self.states.len() as isize + 1]);
 
         self.states.push_front(state_0);
+    }
+
+    /// Combines two NFAs by adding an ε-transition between the first
+    /// state of `self` and the first state of `other`:
+    ///
+    /// ```text
+    /// self(0) -----> ...
+    ///    \    ε
+    ///     `------> other(0) ------> ...
+    ///
+    /// ```
+    ///
+    /// This is useful for combining several NFAs with accepting state
+    /// in order to attempt to match them all at once. This should
+    /// *not* be used with non-accepting NFAs since it would result in
+    /// a bogus NFA.
+    ///
+    /// For this reason this method `panic`s if `self` or `other`
+    /// don't end with an accepting state.
+    pub fn combine(&mut self, mut other: Nfa) {
+        assert!(self.is_accepting());
+        assert!(other.is_accepting());
+
+        // Add the ε-transition to the start of other
+        let other_start = self.states.len() as isize;
+
+        self.states[0].add_move(Epsilon, other_start);
+
+        // Copy the states of other into self
+        self.states.append(&mut other.states);
+    }
+
+    /// Return true if `self` finishes with an accepting state.
+    pub fn is_accepting(&self) -> bool {
+        match self.states.back() {
+            Some(ref s) => s.accepting().is_some(),
+            None => false
+        }
     }
 
     /// Returns a `Vec` of states that are reachable from `states`
