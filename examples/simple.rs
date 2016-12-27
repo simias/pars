@@ -1,7 +1,10 @@
 extern crate pars;
 
+use std::fs::File;
+
 use pars::nfa::Nfa;
 use pars::dfa::Dfa;
+use pars::codegen::CodeGen;
 
 fn main() {
     // (a|b)*abb
@@ -29,4 +32,10 @@ fn main() {
     println!("{:?}", nfa);
 
     println!("{:?}", dfa);
+
+    let mut out = File::create("/tmp/lexer.rs").unwrap();
+
+    let gen = CodeGen::new();
+
+    gen.generate(&dfa, &mut out).unwrap();
 }

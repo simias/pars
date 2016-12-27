@@ -4,7 +4,7 @@ use nfa::Nfa;
 use std::collections::HashMap;
 use std::fmt;
 
-struct State {
+pub struct State {
     moves: HashMap<char, usize>,
     accepting: Option<String>,
 }
@@ -30,7 +30,7 @@ impl State {
         self.moves.insert(input, target);
     }
 
-    fn move_map(&self) -> &HashMap<char, usize> {
+    pub fn move_map(&self) -> &HashMap<char, usize> {
         &self.moves
     }
 }
@@ -40,6 +40,11 @@ pub struct Dfa {
 }
 
 impl Dfa {
+    /// Builds a DFA from the provided NFA.
+    ///
+    /// If the NFA is valid this can't fail, however the DFA can have
+    /// up to the square of the number of states of the NFA in the
+    /// worst case.
     pub fn from_nfa(nfa: &Nfa) -> Dfa {
         // We need a temporary state holding the correspondance
         // between each DFA state and the corresponding NFA states
@@ -125,6 +130,11 @@ impl Dfa {
         Dfa {
             states: dfa_states.into_iter().map(|s| s.dfa_state).collect()
         }
+    }
+
+    /// Returns the vector of states of this DFA
+    pub fn states(&self) -> &Vec<State> {
+        &self.states
     }
 }
 

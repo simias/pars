@@ -1,0 +1,44 @@
+/// Lexer implementation
+struct Lexer<'a> {
+    input_stream: &'a mut ::std::io::Read,
+}
+
+impl<'a> Lexer<'a> {
+    pub fn new<'n>(input_stream: &'n mut ::std::io::Read) -> Lexer<'n> {
+        Lexer {
+            input_stream: input_stream,
+        }
+    }
+
+    pub fn next_token(&mut self %NEXT_PARAMS%) -> Result<%TOKEN_TYPE%, LexerError> {
+        let mut cur_state = Some(States::State0);
+
+        while let Some(state) = cur_state {
+            let mut buf = [0];
+            try!(::std::io::Read::read(self.input_stream, &mut buf));
+
+            // XXX implement utf-8 reads. Maybe add support for custom
+            // readers through a trait?
+            let input = buf[0] as char;
+
+            let mut cur_match = None;
+
+            let next_state =
+                match state {%MATCH_INPUT%
+                };
+
+            cur_state = next_state;
+        }
+    }
+}
+
+/// All the states used by this lexer.
+enum States {%DECLARE_STATES%
+}
+
+/// Lexer error type
+#[derive(Debug)]
+enum LexerError {
+    EndOfFile,
+    IoError(::std::io::Error),
+}
