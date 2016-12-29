@@ -17,13 +17,13 @@ fn main() {
     nfa.concat(Nfa::new('b'));
     nfa.concat(Nfa::new('b'));
 
-    nfa.concat(Nfa::new_accepting("got (a|b)*abb".into()));
+    nfa.concat(Nfa::new_accepting("regex (a|b)*abb".into()));
 
     // abc
     let mut other = Nfa::new('a');
     other.concat(Nfa::new('b'));
     other.concat(Nfa::new('c'));
-    other.concat(Nfa::new_accepting("got abc".into()));
+    other.concat(Nfa::new_accepting("regex abc".into()));
 
     nfa.combine(other);
 
@@ -35,7 +35,9 @@ fn main() {
 
     let mut out = File::create("/tmp/lexer.rs").unwrap();
 
-    let gen = CodeGen::new();
+    let mut gen = CodeGen::new();
+
+    gen.set_token_type("String");
 
     gen.generate(&dfa, &mut out).unwrap();
 }

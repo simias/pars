@@ -23,6 +23,10 @@ impl CodeGen {
         }
     }
 
+    pub fn set_token_type(&mut self, t: &str) {
+        self.token_type = t.into()
+    }
+
     pub fn generate(&self, dfa: &Dfa, output: &mut Write) -> io::Result<()> {
         let states = dfa.states();
 
@@ -46,7 +50,7 @@ impl CodeGen {
 
         let mut states_decl = String::new();
 
-        for i in 0..states.len() {
+        for (i, _) in states.iter().enumerate() {
             states_decl.push_str(&format!("\n    State{},", i));
         }
 
@@ -70,9 +74,18 @@ impl CodeGen {
 
             matcher.push_str("match input {\n");
 
-            for (c, target) in state.move_map() {
-                matcher.push_str(&format!("'{}' => Some(States::State{}),\n",
-                                          c, target));
+            for (c, &target) in state.move_map() {
+
+                matcher.push_str(&format!("'{}' => {{\n", c));
+
+                if let Some(s) = dfa.states()[target].accepting() {
+                    matcher.push_str(&format!(
+                        "accepting_state = Some((self.buffer_offset, \"{}\".into()));\n",
+                        s));
+                }
+
+                matcher.push_str(&format!("Some(States::State{})\n", target));
+                matcher.push_str("}\n");
             }
 
             matcher.push_str("_ => None,\n");

@@ -1,27 +1,43 @@
 /// Lexer implementation
-struct Lexer<'a> {
+pub struct Lexer<'a> {
     input_stream: &'a mut ::std::io::Read,
+    buffer: Vec<u8>,
+    buffer_offset: usize,
 }
 
 impl<'a> Lexer<'a> {
     pub fn new<'n>(input_stream: &'n mut ::std::io::Read) -> Lexer<'n> {
         Lexer {
             input_stream: input_stream,
+            buffer: Vec::new(),
+            buffer_offset: 0,
         }
     }
 
     pub fn next_token(&mut self %NEXT_PARAMS%) -> Result<%TOKEN_TYPE%, LexerError> {
         let mut cur_state = Some(States::State0);
 
+        let match_start = self.buffer_offset;
+
+        let mut accepting_state: Option<(usize, %TOKEN_TYPE%)> = None;
+
         while let Some(state) = cur_state {
-            let mut buf = [0];
-            try!(::std::io::Read::read(self.input_stream, &mut buf));
-
             // XXX implement utf-8 reads. Maybe add support for custom
-            // readers through a trait?
-            let input = buf[0] as char;
+            // readers through a trait or something?
+            let input = match self.next_byte() {
+                Ok(b) => b as char,
+                Err(LexerError::EndOfFile) => {
+                    if self.buffer_offset == match_start {
+                        // Nothing left to match
+                        return Err(LexerError::EndOfFile);
+                    }
+                    // Let's match what we just parsed
+                    break;
+                }
+                Err(e) => return Err(e),
+            };
 
-            let mut cur_match = None;
+            println!("Matching {}...", input);
 
             let next_state =
                 match state {%MATCH_INPUT%
@@ -29,6 +45,43 @@ impl<'a> Lexer<'a> {
 
             cur_state = next_state;
         }
+
+        match accepting_state {
+            Some((match_end, token)) => {
+                // Backtrack to the end of the match
+                self.buffer_offset = match_end;
+
+                println!("{} matched {}", String::from_utf8_lossy(&self.buffer[match_start..match_end]), token);
+
+                Ok(token)
+            }
+            None => Err(LexerError::NoMatch(match_start)),
+        }
+    }
+
+    fn next_byte(&mut self) -> Result<u8, LexerError> {
+        if self.buffer.len() == self.buffer_offset {
+            // Reached the end of the buffer, refill
+            let buf_size = 4096;
+
+            self.buffer.resize(buf_size + self.buffer_offset, 0);
+
+            let count =
+                try!(::std::io::Read::read(self.input_stream,
+                                           &mut self.buffer[self.buffer_offset..]));
+
+
+            self.buffer.truncate(self.buffer_offset + count);
+
+            if count == 0 {
+                return Err(LexerError::EndOfFile);
+            }
+        }
+
+        let b = self.buffer[self.buffer_offset];
+        self.buffer_offset += 1;
+
+        Ok(b)
     }
 }
 
@@ -38,7 +91,30 @@ enum States {%DECLARE_STATES%
 
 /// Lexer error type
 #[derive(Debug)]
-enum LexerError {
+pub enum LexerError {
     EndOfFile,
-    IoError(::std::io::Error),
+    NoMatch(usize),
+    IoError(std::io::Error),
+}
+
+impl std::convert::From<std::io::Error> for LexerError {
+    fn from(e: std::io::Error) -> LexerError {
+        LexerError::IoError(e)
+    }
+}
+
+fn main() {
+    let mut buf: &[u8] = b"abcbabbababbaab";
+
+    let mut lexer = Lexer::new(&mut buf);
+
+    loop {
+        match lexer.next_token() {
+            Ok(token) =>
+                println!("Got token {}", token),
+            Err(e) => {
+                panic!("Got error {:?}", e);
+            }
+        }
+    }
 }

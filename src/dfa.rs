@@ -33,6 +33,16 @@ impl State {
     pub fn move_map(&self) -> &HashMap<char, usize> {
         &self.moves
     }
+
+    /// Returns `true` if this state has at least one move on some
+    /// input.
+    pub fn has_moves(&self) -> bool {
+        return !self.moves.is_empty()
+    }
+
+    pub fn accepting(&self)-> Option<&String> {
+        self.accepting.as_ref()
+    }
 }
 
 pub struct Dfa {
