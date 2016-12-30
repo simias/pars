@@ -1,0 +1,12 @@
+language: rust
+os:
+  - linux
+before_script:
+  - rustc -V
+  - cargo -V
+script:
+  - cargo build -v
+  - cargo doc
+  - cargo test
+  - cd pars-lexer/tests/
+  - cargo test
