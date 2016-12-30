@@ -94,27 +94,11 @@ enum States {%DECLARE_STATES%
 pub enum LexerError {
     EndOfFile,
     NoMatch(usize),
-    IoError(std::io::Error),
+    IoError(::std::io::Error),
 }
 
-impl std::convert::From<std::io::Error> for LexerError {
-    fn from(e: std::io::Error) -> LexerError {
+impl ::std::convert::From<::std::io::Error> for LexerError {
+    fn from(e: ::std::io::Error) -> LexerError {
         LexerError::IoError(e)
-    }
-}
-
-fn main() {
-    let mut buf: &[u8] = b"abcbabbababbaab";
-
-    let mut lexer = Lexer::new(&mut buf);
-
-    loop {
-        match lexer.next_token() {
-            Ok(token) =>
-                println!("Got token {}", token),
-            Err(e) => {
-                panic!("Got error {:?}", e);
-            }
-        }
     }
 }

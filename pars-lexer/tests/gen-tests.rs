@@ -1,10 +1,12 @@
-extern crate pars;
+extern crate pars_lexer;
 
 use std::fs::File;
+use std::env;
+use std::path::Path;
 
-use pars::nfa::Nfa;
-use pars::dfa::Dfa;
-use pars::codegen::CodeGen;
+use pars_lexer::nfa::Nfa;
+use pars_lexer::dfa::Dfa;
+use pars_lexer::codegen::CodeGen;
 
 fn main() {
     // (a|b)*abb
@@ -29,11 +31,9 @@ fn main() {
 
     let dfa = Dfa::from_nfa(&nfa);
 
-    println!("{:?}", nfa);
+    let outfile = Path::new(&env::var("OUT_DIR").unwrap()).join("simple.rs");
 
-    println!("{:?}", dfa);
-
-    let mut out = File::create("/tmp/lexer.rs").unwrap();
+    let mut out = File::create(outfile).unwrap();
 
     let mut gen = CodeGen::new();
 

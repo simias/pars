@@ -1,3 +1,8 @@
-pub mod nfa;
-pub mod dfa;
-pub mod codegen;
+extern crate pars_lexer;
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn it_works() {
+    }
+}

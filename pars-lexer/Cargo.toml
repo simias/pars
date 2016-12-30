@@ -1,7 +1,6 @@
 [package]
-name = "pars"
+name = "pars-lexer"
 version = "0.1.0"
 authors = ["Lionel Flandrin <lionel@svkt.org>"]
 
 [dependencies]
-pars-lexer = { path = "pars-lexer" }
