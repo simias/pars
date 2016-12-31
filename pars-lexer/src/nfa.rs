@@ -1,13 +1,13 @@
 //! Nondeterministic Finite Automaton (NFA) implementation.
 
-use std::collections::{HashMap, VecDeque};
+use std::collections::{BTreeMap, VecDeque};
 use std::fmt;
 
 /// NFA state
 struct State {
     /// Map of all valid moves from this state. The target state is
     /// stored as a signed offset in the
-    moves: HashMap<Transition, Vec<isize>>,
+    moves: BTreeMap<Transition, Vec<isize>>,
     /// `None` if the state is non-accepting
     accepting: Option<String>,
 }
@@ -16,7 +16,7 @@ impl State {
     /// Creates a new non-accepting state with no moves
     fn new() -> State {
         State {
-            moves: HashMap::new(),
+            moves: BTreeMap::new(),
             accepting: None,
         }
     }
@@ -25,7 +25,7 @@ impl State {
     /// Creates a new accepting state with no moves
     fn new_accepting(desc: String) -> State {
         State {
-            moves: HashMap::new(),
+            moves: BTreeMap::new(),
             accepting: Some(desc),
         }
     }
@@ -56,7 +56,7 @@ impl State {
         }
     }
 
-    fn move_map(&self) -> &HashMap<Transition, Vec<isize>> {
+    fn move_map(&self) -> &BTreeMap<Transition, Vec<isize>> {
         &self.moves
     }
 }
@@ -308,19 +308,19 @@ impl Nfa {
     ///              `-------> (6) ------> (7)
     /// ```
     ///
-    /// `get_move_set(&[0])` would return a `HashMap` containing a
+    /// `get_move_set(&[0])` would return a `BTreeMap` containing a
     /// single entry: `'a' -> [2, 3]`.
     ///
     /// `get_move_set(&[0, 1, 6])` (the ε-closure of state 0) would
-    /// return a `HashMap` with 3 entries:
+    /// return a `BTreeMap` with 3 entries:
     ///
     /// ```text
     /// 'a' -> [2, 3]
     /// 'c' -> [5, 7]
     /// 'd' -> [7]
     /// ```
-    pub fn get_move_set(&self, states: &[usize]) -> HashMap<char, Vec<usize>> {
-        let mut m_s = HashMap::new();
+    pub fn get_move_set(&self, states: &[usize]) -> BTreeMap<char, Vec<usize>> {
+        let mut m_s = BTreeMap::new();
 
         for &s in states {
             if let Some(state) = self.states.get(s) {
@@ -385,7 +385,7 @@ impl fmt::Debug for Nfa {
 }
 
 /// An `Option`-like enum holding a state transition
-#[derive(PartialEq, Eq, Copy, Clone, Debug, Hash)]
+#[derive(PartialEq, Eq, Copy, Clone, Debug, PartialOrd, Ord)]
 pub enum Transition {
     /// Transition on some input character
     Input(char),

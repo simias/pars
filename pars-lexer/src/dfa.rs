@@ -1,11 +1,11 @@
 //! Deterministic Finite Automaton (DFA) implementation.
 
 use nfa::Nfa;
-use std::collections::HashMap;
+use std::collections::BTreeMap;
 use std::fmt;
 
 pub struct State {
-    moves: HashMap<char, usize>,
+    moves: BTreeMap<char, usize>,
     accepting: Option<String>,
 }
 
@@ -13,7 +13,7 @@ impl State {
     /// Create a new non-accepting state with no moves
     fn new() -> State {
         State {
-            moves: HashMap::new(),
+            moves: BTreeMap::new(),
             accepting: None,
         }
     }
@@ -21,7 +21,7 @@ impl State {
     /// Create a new accepting state with no moves
     fn new_accepting(desc: String) -> State {
         State {
-            moves: HashMap::new(),
+            moves: BTreeMap::new(),
             accepting: Some(desc),
         }
     }
@@ -30,7 +30,7 @@ impl State {
         self.moves.insert(input, target);
     }
 
-    pub fn move_map(&self) -> &HashMap<char, usize> {
+    pub fn move_map(&self) -> &BTreeMap<char, usize> {
         &self.moves
     }
 

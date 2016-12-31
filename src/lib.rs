@@ -1,4 +1,4 @@
-extern crate pars_lexer;
+pub extern crate pars_lexer as lexer;
 
 #[cfg(test)]
 mod tests {
