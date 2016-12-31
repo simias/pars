@@ -72,11 +72,19 @@ impl CodeGen {
         for (state_idx, state) in dfa.states().iter().enumerate() {
             matcher.push_str(&format!("\nStates::State{} => {{\n", state_idx));
 
-            matcher.push_str("match input {\n");
+            matcher.push_str("match input as u32 {\n");
 
             for (c, &target) in state.move_map() {
 
-                matcher.push_str(&format!("'{}' => {{\n", c));
+                let first = c.first();
+                let last = c.last();
+
+                if first == last {
+                    matcher.push_str(&format!("0x{:x} => {{\n", first));
+                } else {
+                    matcher.push_str(&format!("0x{:x}...0x{:x} => {{\n",
+                                              first, last));
+                }
 
                 if let Some(s) = dfa.states()[target].accepting() {
                     matcher.push_str(&format!(

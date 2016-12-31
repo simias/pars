@@ -1,71 +1,76 @@
-#[cfg(not(test))]
-fn main() {
-    generate::simple();
+mod simple {
+    include!(concat!(env!("OUT_DIR"), "/simple.rs"));
+
+    #[test]
+    fn simple() {
+        let mut buf: &[u8] = b"abcbabbababbabc";
+
+        let mut lexer = Lexer::new(&mut buf);
+
+        assert_eq!(lexer.next_token().unwrap(), "regex abc".to_owned());
+        assert_eq!(lexer.next_token().unwrap(), "regex (a|b)*abb".to_owned());
+        assert_eq!(lexer.next_token().unwrap(), "regex abc".to_owned());
+
+        match lexer.next_token() {
+            Err(LexerError::EndOfFile) => (),
+            e => panic!("Expected EOF, got {:?}", e),
+        }
+    }
 }
 
-#[cfg(not(test))]
-mod generate {
-    extern crate pars_lexer;
 
-    use std::fs::File;
-    use std::env;
-    use std::path::Path;
+mod intervals {
+    include!(concat!(env!("OUT_DIR"), "/intervals.rs"));
 
-    use self::pars_lexer::nfa::Nfa;
-    use self::pars_lexer::dfa::Dfa;
-    use self::pars_lexer::codegen::CodeGen;
+    #[test]
+    fn intervals() {
+        let mut buf: &[u8] = b"foo bar   aZ _AbC12 a_b_c a0_bc 0invalid";
 
-    pub fn simple() {
-        // (a|b)*abb
-        let mut nfa = Nfa::new('a');
-        nfa.union(Nfa::new('b'));
-        nfa.star();
+        let mut lexer = Lexer::new(&mut buf);
 
-        nfa.concat(Nfa::new('a'));
-        nfa.concat(Nfa::new('b'));
-        nfa.concat(Nfa::new('b'));
+        assert_eq!(lexer.next_token().unwrap(), "id".to_owned());
+        assert_eq!(lexer.next_token().unwrap(), "space".to_owned());
+        assert_eq!(lexer.next_token().unwrap(), "id".to_owned());
+        assert_eq!(lexer.next_token().unwrap(), "space".to_owned());
+        assert_eq!(lexer.next_token().unwrap(), "id".to_owned());
+        assert_eq!(lexer.next_token().unwrap(), "space".to_owned());
+        assert_eq!(lexer.next_token().unwrap(), "id".to_owned());
+        assert_eq!(lexer.next_token().unwrap(), "space".to_owned());
+        assert_eq!(lexer.next_token().unwrap(), "id".to_owned());
+        assert_eq!(lexer.next_token().unwrap(), "space".to_owned());
+        assert_eq!(lexer.next_token().unwrap(), "id".to_owned());
+        assert_eq!(lexer.next_token().unwrap(), "space".to_owned());
 
-        nfa.concat(Nfa::new_accepting("regex (a|b)*abb".into()));
-
-        // abc
-        let mut other = Nfa::new('a');
-        other.concat(Nfa::new('b'));
-        other.concat(Nfa::new('c'));
-        other.concat(Nfa::new_accepting("regex abc".into()));
-
-        nfa.combine(other);
-
-        let dfa = Dfa::from_nfa(&nfa);
-
-        let outfile = Path::new(&env::var("OUT_DIR").unwrap()).join("simple.rs");
-
-        let mut out = File::create(outfile).unwrap();
-
-        let mut gen = CodeGen::new();
-
-        gen.set_token_type("String");
-
-        gen.generate(&dfa, &mut out).unwrap();
+        match lexer.next_token() {
+            Err(LexerError::NoMatch(32)) => (),
+            e => panic!("Expected match error, got {:?}", e),
+        }
     }
 }
 
 #[cfg(test)]
-mod simple {
-    include!(concat!(env!("OUT_DIR"), "/simple.rs"));
-}
+mod intersecting_intervals {
+    include!(concat!(env!("OUT_DIR"), "/intersecting-intervals.rs"));
 
-#[test]
-fn simple() {
-    let mut buf: &[u8] = b"abcbabbababbabcd";
+    #[test]
+    fn intersecting_intervals() {
+        let mut buf: &[u8] = b"abc bcd cde xyz  azerty";
 
-    let mut lexer = simple::Lexer::new(&mut buf);
+        let mut lexer = Lexer::new(&mut buf);
 
-    assert_eq!(lexer.next_token().unwrap(), "regex abc".to_owned());
-    assert_eq!(lexer.next_token().unwrap(), "regex (a|b)*abb".to_owned());
-    assert_eq!(lexer.next_token().unwrap(), "regex abc".to_owned());
+        assert_eq!(lexer.next_token().unwrap(), "ae".to_owned());
+        assert_eq!(lexer.next_token().unwrap(), "space".to_owned());
+        assert_eq!(lexer.next_token().unwrap(), "bd".to_owned());
+        assert_eq!(lexer.next_token().unwrap(), "space".to_owned());
+        assert_eq!(lexer.next_token().unwrap(), "ae".to_owned());
+        assert_eq!(lexer.next_token().unwrap(), "space".to_owned());
+        assert_eq!(lexer.next_token().unwrap(), "cz".to_owned());
+        assert_eq!(lexer.next_token().unwrap(), "space".to_owned());
+        assert_eq!(lexer.next_token().unwrap(), "az".to_owned());
 
-    match lexer.next_token() {
-        Err(simple::LexerError::NoMatch(pos)) => assert_eq!(pos, 15),
-        _ => unreachable!(),
+        match lexer.next_token() {
+            Err(LexerError::EndOfFile) => (),
+            e => panic!("Expected EOF, got {:?}", e),
+        }
     }
 }

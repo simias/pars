@@ -3,7 +3,10 @@
 use std::collections::{BTreeMap, VecDeque};
 use std::fmt;
 
+use character::Interval;
+
 /// NFA state
+#[derive(Clone)]
 struct State {
     /// Map of all valid moves from this state. The target state is
     /// stored as a signed offset in the
@@ -20,7 +23,6 @@ impl State {
             accepting: None,
         }
     }
-
 
     /// Creates a new accepting state with no moves
     fn new_accepting(desc: String) -> State {
@@ -62,6 +64,7 @@ impl State {
 }
 
 /// NFA graph
+#[derive(Clone)]
 pub struct Nfa {
     /// Vector of the states of the Nfa. Each state represents
     /// transitions as signed indices pointing to the other states in
@@ -76,10 +79,10 @@ impl Nfa {
     ///        c
     /// (0) ------> (f)
     /// ```
-    pub fn new(c: char) -> Nfa {
+    pub fn new(i: Interval) -> Nfa {
         let mut state = State::new();
 
-        state.set_moves(Input(c), vec![1]);
+        state.set_moves(Input(i), vec![1]);
 
         let mut states = VecDeque::new();
 
@@ -105,6 +108,17 @@ impl Nfa {
 
         Nfa {
             states: states,
+        }
+    }
+
+    /// Creates a new NFA with no states
+    ///
+    /// ```text
+    /// (0)
+    /// ```
+    pub fn new_empty() -> Nfa {
+        Nfa {
+            states: VecDeque::new(),
         }
     }
 
@@ -212,6 +226,32 @@ impl Nfa {
         self.states.push_front(state_0);
     }
 
+    /// Compute the positive closure of this NFA. `a.positive()` matches
+    /// `a+` or `aa*`.
+    ///
+    /// ```text
+    ///                    ε
+    ///               ,--------.
+    ///        ε     v     a    \      ε
+    /// (0) ------> (1) ------> (2) ------> (f)
+    /// ```
+    pub fn positive(&mut self) {
+        // Create state (2) and have it point at the new final state
+        // (f) and the current first state (1)
+        let mut state_2 = State::new();
+
+        state_2.set_moves(Epsilon, vec![1, -(self.states.len() as isize)]);
+
+        self.states.push_back(state_2);
+
+        // Create state (0) pointing at (1)
+        let mut state_0 = State::new();
+
+        state_0.set_moves(Epsilon, vec![1]);
+
+        self.states.push_front(state_0);
+    }
+
     /// Combines two NFAs by adding an ε-transition between the first
     /// state of `self` and the first state of `other`:
     ///
@@ -229,6 +269,41 @@ impl Nfa {
     ///
     /// For this reason this method `panic`s if `self` or `other`
     /// don't end with an accepting state.
+    ///
+    /// While matching if a string leads to two accepting state then
+    /// the first one in combination order is used:
+    ///
+    /// ```rust
+    /// use pars_lexer::character::Interval;
+    /// use pars_lexer::nfa::Nfa;
+    ///
+    /// // Accepts [a-z]+
+    /// let mut lower = Nfa::new(Interval::new('a', 'z'));
+    /// lower.positive();
+    /// lower.concat(Nfa::new_accepting("found lowercase".into()));
+    ///
+    /// // Accepts [a-zA-Z]+
+    /// let mut mixed = Nfa::new(Interval::new('a', 'z'));
+    /// mixed.union(Nfa::new(Interval::new('A', 'Z')));
+    /// mixed.positive();
+    /// mixed.concat(Nfa::new_accepting("found mixed case".into()));
+    ///
+    /// // Clearly both regexes above accept the string "lowercase"
+    /// // since `lower` is a subset of `mixed`. In this situation the
+    /// // combination order matters:
+    ///
+    /// // If `mixed` is combined before `lower` then it takes precedence,
+    /// // therefore both the strings "lowercase" and "MixedCase" will end
+    /// // up being accepted by `mixed`. `lower` will never match since
+    /// // it's a subset of `mixed`.
+    /// let mixed_first = mixed.clone().combine(lower.clone());
+    ///
+    /// // On the other hand if we combine `lower` first then it will
+    /// // take precedence in case of a "double match", so "lowercase"
+    /// // will match `lower` while "MixedCase" will naturally still
+    /// // match `mixed`.
+    /// let lower_first = lower.clone().combine(mixed.clone());
+    /// ```
     pub fn combine(&mut self, mut other: Nfa) {
         assert!(self.is_accepting());
         assert!(other.is_accepting());
@@ -319,7 +394,7 @@ impl Nfa {
     /// 'c' -> [5, 7]
     /// 'd' -> [7]
     /// ```
-    pub fn get_move_set(&self, states: &[usize]) -> BTreeMap<char, Vec<usize>> {
+    pub fn get_move_set(&self, states: &[usize]) -> BTreeMap<Interval, Vec<usize>> {
         let mut m_s = BTreeMap::new();
 
         for &s in states {
@@ -367,13 +442,7 @@ impl fmt::Debug for Nfa {
             }
 
             for (&transition, target) in state.move_map() {
-                let transition =
-                    match transition {
-                        Input(c) => c,
-                        Epsilon => 'ε',
-                    };
-
-                try!(write!(f, "    {} ->", transition));
+                try!(write!(f, "    {:?} ->", transition));
                 for t in target {
                     try!(write!(f, " {}", state_idx as isize + t));
                 }
@@ -385,12 +454,21 @@ impl fmt::Debug for Nfa {
 }
 
 /// An `Option`-like enum holding a state transition
-#[derive(PartialEq, Eq, Copy, Clone, Debug, PartialOrd, Ord)]
+#[derive(PartialEq, Eq, Copy, Clone, PartialOrd, Ord)]
 pub enum Transition {
     /// Transition on some input character
-    Input(char),
+    Input(Interval),
     /// ε-transition, doens't consume any input
     Epsilon,
 }
 
 use self::Transition::{Input, Epsilon};
+
+impl fmt::Debug for Transition {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            &Input(i) => write!(f, "{:?}", i),
+            &Epsilon => write!(f, "ε"),
+        }
+    }
+}

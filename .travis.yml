@@ -8,5 +8,7 @@ script:
   - cargo build -v
   - cargo doc
   - cargo test
-  - cd pars-lexer/tests/
+  - cd pars-lexer
+  - cargo test
+  - cd tests/
   - cargo test
