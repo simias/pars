@@ -96,34 +96,34 @@ mod generate {
     }
 
     pub fn intersecting_intervals() {
-        let lower = Nfa::new(Interval::new('a', 'z'));
+        let mut az = Nfa::new(Interval::new('a', 'z'));
+        az.positive();
+        az.concat(Nfa::new_accepting("az".into()));
 
-        // [a-z]+
-        let mut match_lower = lower.clone();
-        match_lower.positive();
-        match_lower.concat(Nfa::new_accepting("lowercase".into()));
+        let mut ae = Nfa::new(Interval::new('a', 'e'));
+        ae.positive();
+        ae.concat(Nfa::new_accepting("ae".into()));
 
-        // a+
-        let mut match_aplus = Nfa::new(Interval::new_single('a'));
-        match_aplus.positive();
-        match_aplus.concat(Nfa::new_accepting("a+".into()));
+        let mut cz = Nfa::new(Interval::new('c', 'z'));
+        cz.positive();
+        cz.concat(Nfa::new_accepting("cz".into()));
+
+        let mut bd = Nfa::new(Interval::new('b', 'd'));
+        bd.positive();
+        bd.concat(Nfa::new_accepting("bd".into()));
 
         // [ ]+
         let mut spaces = Nfa::new(Interval::new_single(' '));
         spaces.positive();
         spaces.concat(Nfa::new_accepting("space".into()));
 
-        let mut nfa = match_lower.clone();
-        nfa.combine(match_aplus);
+        let mut nfa = bd;
+        nfa.combine(ae);
+        nfa.combine(cz);
+        nfa.combine(az);
         nfa.combine(spaces);
 
-        println!("{:?}", nfa);
-
         let dfa = Dfa::from_nfa(&nfa);
-
-        println!("{:?}", dfa);
-
-        panic!();
 
         let outfile = Path::new(&env::var("OUT_DIR").unwrap()).join("intersecting-intervals.rs");
 
@@ -196,25 +196,22 @@ mod intersecting_intervals {
 
 #[test]
 fn intersecting_intervals() {
-    let mut buf: &[u8] = b"abcz ABCZ AbCz";
+    let mut buf: &[u8] = b"abc bcd cde xyz  azerty";
 
     let mut lexer = intersecting_intervals::Lexer::new(&mut buf);
 
-    assert_eq!(lexer.next_token().unwrap(), "id".to_owned());
+    assert_eq!(lexer.next_token().unwrap(), "ae".to_owned());
     assert_eq!(lexer.next_token().unwrap(), "space".to_owned());
-    assert_eq!(lexer.next_token().unwrap(), "id".to_owned());
+    assert_eq!(lexer.next_token().unwrap(), "bd".to_owned());
     assert_eq!(lexer.next_token().unwrap(), "space".to_owned());
-    assert_eq!(lexer.next_token().unwrap(), "id".to_owned());
+    assert_eq!(lexer.next_token().unwrap(), "ae".to_owned());
     assert_eq!(lexer.next_token().unwrap(), "space".to_owned());
-    assert_eq!(lexer.next_token().unwrap(), "id".to_owned());
+    assert_eq!(lexer.next_token().unwrap(), "cz".to_owned());
     assert_eq!(lexer.next_token().unwrap(), "space".to_owned());
-    assert_eq!(lexer.next_token().unwrap(), "id".to_owned());
-    assert_eq!(lexer.next_token().unwrap(), "space".to_owned());
-    assert_eq!(lexer.next_token().unwrap(), "id".to_owned());
-    assert_eq!(lexer.next_token().unwrap(), "space".to_owned());
+    assert_eq!(lexer.next_token().unwrap(), "az".to_owned());
 
     match lexer.next_token() {
-        Err(intersecting_intervals::LexerError::NoMatch(32)) => (),
-        e => panic!("Expected match error, got {:?}", e),
+        Err(intersecting_intervals::LexerError::EndOfFile) => (),
+        e => panic!("Expected EOF, got {:?}", e),
     }
 }
