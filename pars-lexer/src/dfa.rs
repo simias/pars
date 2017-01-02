@@ -108,25 +108,7 @@ impl Dfa {
             // `state.nfa_states`.
             let move_set = nfa.get_move_set(&dfa_states[cur_state].nfa_states);
 
-            println!("Pre:");
-            for (&transition, states) in &move_set {
-                print!("{:?} -> ", transition);
-                for s in states {
-                    print!("{} ", s);
-                }
-                println!("");
-            }
-
             let move_set = Dfa::resolve_intersections(move_set);
-
-            println!("Post:");
-            for (&transition, states) in &move_set {
-                print!("{:?} -> ", transition);
-                for s in states {
-                    print!("{} ", s);
-                }
-                println!("");
-            }
 
             for (&transition, states) in &move_set {
 
@@ -194,8 +176,6 @@ impl Dfa {
                 while let Some((next_interval, next_states)) = iter.next() {
                     let (left, inter, right) =
                         interval.intersect(next_interval);
-
-                    println!("{:?},{:?} {:?} {:?} {:?}", interval, next_interval, left, inter, right);
 
                     if let Some(inter) = inter {
 

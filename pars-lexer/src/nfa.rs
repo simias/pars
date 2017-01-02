@@ -24,7 +24,6 @@ impl State {
         }
     }
 
-
     /// Creates a new accepting state with no moves
     fn new_accepting(desc: String) -> State {
         State {
@@ -109,6 +108,17 @@ impl Nfa {
 
         Nfa {
             states: states,
+        }
+    }
+
+    /// Creates a new NFA with no states
+    ///
+    /// ```text
+    /// (0)
+    /// ```
+    pub fn new_empty() -> Nfa {
+        Nfa {
+            states: VecDeque::new(),
         }
     }
 
