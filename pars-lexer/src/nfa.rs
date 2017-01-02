@@ -3,7 +3,10 @@
 use std::collections::{BTreeMap, VecDeque};
 use std::fmt;
 
+use character::Interval;
+
 /// NFA state
+#[derive(Clone)]
 struct State {
     /// Map of all valid moves from this state. The target state is
     /// stored as a signed offset in the
@@ -62,6 +65,7 @@ impl State {
 }
 
 /// NFA graph
+#[derive(Clone)]
 pub struct Nfa {
     /// Vector of the states of the Nfa. Each state represents
     /// transitions as signed indices pointing to the other states in
@@ -76,10 +80,10 @@ impl Nfa {
     ///        c
     /// (0) ------> (f)
     /// ```
-    pub fn new(c: char) -> Nfa {
+    pub fn new(i: Interval) -> Nfa {
         let mut state = State::new();
 
-        state.set_moves(Input(c), vec![1]);
+        state.set_moves(Input(i), vec![1]);
 
         let mut states = VecDeque::new();
 
@@ -212,6 +216,25 @@ impl Nfa {
         self.states.push_front(state_0);
     }
 
+    /// Compute the positive closure of this NFA. `a.positive()` matches
+    /// `a+` or `aa*`.
+    ///
+    /// ```text
+    ///        ε
+    ///   ,--------.
+    ///  v     a    \
+    /// (0) ------> (1) ------> (f)
+    /// ```
+    pub fn positive(&mut self) {
+        // Create state (1) and have it point at the new final state
+        // (f) and the first state (0)
+        let mut state_1 = State::new();
+
+        state_1.set_moves(Epsilon, vec![1, -(self.states.len() as isize)]);
+
+        self.states.push_back(state_1);
+    }
+
     /// Combines two NFAs by adding an ε-transition between the first
     /// state of `self` and the first state of `other`:
     ///
@@ -319,7 +342,7 @@ impl Nfa {
     /// 'c' -> [5, 7]
     /// 'd' -> [7]
     /// ```
-    pub fn get_move_set(&self, states: &[usize]) -> BTreeMap<char, Vec<usize>> {
+    pub fn get_move_set(&self, states: &[usize]) -> BTreeMap<Interval, Vec<usize>> {
         let mut m_s = BTreeMap::new();
 
         for &s in states {
@@ -367,13 +390,7 @@ impl fmt::Debug for Nfa {
             }
 
             for (&transition, target) in state.move_map() {
-                let transition =
-                    match transition {
-                        Input(c) => c,
-                        Epsilon => 'ε',
-                    };
-
-                try!(write!(f, "    {} ->", transition));
+                try!(write!(f, "    {:?} ->", transition));
                 for t in target {
                     try!(write!(f, " {}", state_idx as isize + t));
                 }
@@ -385,12 +402,21 @@ impl fmt::Debug for Nfa {
 }
 
 /// An `Option`-like enum holding a state transition
-#[derive(PartialEq, Eq, Copy, Clone, Debug, PartialOrd, Ord)]
+#[derive(PartialEq, Eq, Copy, Clone, PartialOrd, Ord)]
 pub enum Transition {
     /// Transition on some input character
-    Input(char),
+    Input(Interval),
     /// ε-transition, doens't consume any input
     Epsilon,
 }
 
 use self::Transition::{Input, Epsilon};
+
+impl fmt::Debug for Transition {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            &Input(i) => write!(f, "{:?}", i),
+            &Epsilon => write!(f, "ε"),
+        }
+    }
+}

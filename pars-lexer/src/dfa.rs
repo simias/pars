@@ -4,8 +4,10 @@ use nfa::Nfa;
 use std::collections::BTreeMap;
 use std::fmt;
 
+use character::Interval;
+
 pub struct State {
-    moves: BTreeMap<char, usize>,
+    moves: BTreeMap<Interval, usize>,
     accepting: Option<String>,
 }
 
@@ -26,11 +28,11 @@ impl State {
         }
     }
 
-    fn set_move(&mut self, input: char, target: usize) {
+    fn set_move(&mut self, input: Interval, target: usize) {
         self.moves.insert(input, target);
     }
 
-    pub fn move_map(&self) -> &BTreeMap<char, usize> {
+    pub fn move_map(&self) -> &BTreeMap<Interval, usize> {
         &self.moves
     }
 
@@ -156,7 +158,7 @@ impl fmt::Debug for Dfa {
                 None => try!(writeln!(f, "({}):", state_idx)),
             }
             for (c, target) in state.move_map() {
-                try!(writeln!(f, "  {} -> {}", c, target));
+                try!(writeln!(f, "  {:?} -> {}", c, target));
             }
         }
         Ok(())

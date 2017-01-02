@@ -1,6 +1,8 @@
+use std::fmt;
+
 /// A character interval matching any character it containis
 /// inclusively
-#[derive(PartialEq, Eq, Debug, PartialOrd, Ord)]
+#[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub struct Interval {
     first: u32,
     last: u32,
@@ -8,7 +10,11 @@ pub struct Interval {
 
 impl Interval {
     /// Create an interval that matches `[first-last]`
-    pub fn new(first: char, last: char) -> Interval {
+    pub fn new(mut first: char, mut last: char) -> Interval {
+        if first > last {
+            ::std::mem::swap(&mut first, &mut last);
+        }
+
         Interval {
             first: first as u32,
             last: last as u32,
@@ -25,7 +31,43 @@ impl Interval {
 
     /// Returs `true` if `other` intersects `self`
     pub fn intersects(&self, other: &Interval) -> bool {
-        self.first <= other.last && self.last >= other.first
+        self.first <= other.last && other.first <= self.last
+    }
+
+    pub fn first(&self) -> u32 {
+        self.first
+    }
+
+    pub fn last(&self) -> u32 {
+        self.last
+    }
+}
+
+impl fmt::Debug for Interval {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        try!(write!(f, "["));
+        try!(write_char(f, self.first));
+
+        if self.first != self.last {
+            try!(write!(f, "-"));
+            try!(write_char(f, self.last));
+        }
+
+        write!(f, "]")
+    }
+}
+
+fn write_char(f: &mut fmt::Formatter, c: u32) -> fmt::Result {
+    if c <= 0xff {
+        let c = c as u8;
+
+        match c {
+            b'!'...b'~' => write!(f, "{}", c as char),
+            _ => write!(f, "\\x{:02x}", c)
+
+        }
+    } else {
+        write!(f, "\\x{{{:x}}}", c)
     }
 }
 
