@@ -75,16 +75,11 @@ impl Dfa {
 
                 for &s in &n_s {
                     if let Some(a) = nfa.accepting(s) {
-                        if let Some(p) = accepting {
-                            // XXX should have a priority paremeter
-                            // here (I believe the rule in lex is that
-                            // the first rule in the file takes
-                            // precedence in this case)
-                            panic!("DFA state has two accepting NFA states: \
-                                    {} and {}", p, a);
-                        }
-
                         accepting = Some(a);
+                        // The first accepting state found takes
+                        // priority over any subsequent one so it's no
+                        // use searching further.
+                        break;
                     }
                 }
 

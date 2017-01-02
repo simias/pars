@@ -220,19 +220,26 @@ impl Nfa {
     /// `a+` or `aa*`.
     ///
     /// ```text
-    ///        ε
-    ///   ,--------.
-    ///  v     a    \
-    /// (0) ------> (1) ------> (f)
+    ///                    ε
+    ///               ,--------.
+    ///        ε     v     a    \      ε
+    /// (0) ------> (1) ------> (2) ------> (f)
     /// ```
     pub fn positive(&mut self) {
-        // Create state (1) and have it point at the new final state
-        // (f) and the first state (0)
-        let mut state_1 = State::new();
+        // Create state (2) and have it point at the new final state
+        // (f) and the current first state (1)
+        let mut state_2 = State::new();
 
-        state_1.set_moves(Epsilon, vec![1, -(self.states.len() as isize)]);
+        state_2.set_moves(Epsilon, vec![1, -(self.states.len() as isize)]);
 
-        self.states.push_back(state_1);
+        self.states.push_back(state_2);
+
+        // Create state (0) pointing at (1)
+        let mut state_0 = State::new();
+
+        state_0.set_moves(Epsilon, vec![1]);
+
+        self.states.push_front(state_0);
     }
 
     /// Combines two NFAs by adding an ε-transition between the first
@@ -252,6 +259,41 @@ impl Nfa {
     ///
     /// For this reason this method `panic`s if `self` or `other`
     /// don't end with an accepting state.
+    ///
+    /// While matching if a string leads to two accepting state then
+    /// the first one in combination order is used:
+    ///
+    /// ```rust
+    /// use pars_lexer::character::Interval;
+    /// use pars_lexer::nfa::Nfa;
+    ///
+    /// // Accepts [a-z]+
+    /// let mut lower = Nfa::new(Interval::new('a', 'z'));
+    /// lower.positive();
+    /// lower.concat(Nfa::new_accepting("found lowercase".into()));
+    ///
+    /// // Accepts [a-zA-Z]+
+    /// let mut mixed = Nfa::new(Interval::new('a', 'z'));
+    /// mixed.union(Nfa::new(Interval::new('A', 'Z')));
+    /// mixed.positive();
+    /// mixed.concat(Nfa::new_accepting("found mixed case".into()));
+    ///
+    /// // Clearly both regexes above accept the string "lowercase"
+    /// // since `lower` is a subset of `mixed`. In this situation the
+    /// // combination order matters:
+    ///
+    /// // If `mixed` is combined before `lower` then it takes precedence,
+    /// // therefore both the strings "lowercase" and "MixedCase" will end
+    /// // up being accepted by `mixed`. `lower` will never match since
+    /// // it's a subset of `mixed`.
+    /// let mixed_first = mixed.clone().combine(lower.clone());
+    ///
+    /// // On the other hand if we combine `lower` first then it will
+    /// // take precedence in case of a "double match", so "lowercase"
+    /// // will match `lower` while "MixedCase" will naturally still
+    /// // match `mixed`.
+    /// let lower_first = lower.clone().combine(mixed.clone());
+    /// ```
     pub fn combine(&mut self, mut other: Nfa) {
         assert!(self.is_accepting());
         assert!(other.is_accepting());
