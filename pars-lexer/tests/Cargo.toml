@@ -2,7 +2,7 @@
 name = "tests"
 version = "0.1.0"
 authors = ["Lionel Flandrin <lionel@svkt.org>"]
-build = "src/main.rs"
+build = "src/lexers.rs"
 
 [build-dependencies]
 pars-lexer = { path = ".." }
