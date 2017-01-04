@@ -24,8 +24,8 @@ impl<'a> Lexer<'a> {
         while let Some(state) = cur_state {
             // XXX implement utf-8 reads. Maybe add support for custom
             // readers through a trait or something?
-            let input = match self.next_byte() {
-                Ok(b) => b as char,
+            let input = match self.next_utf8_char() {
+                Ok(c) => c,
                 Err(LexerError::EndOfFile) => {
                     if self.buffer_offset == match_start {
                         // Nothing left to match
@@ -59,7 +59,55 @@ impl<'a> Lexer<'a> {
         }
     }
 
-    fn next_byte(&mut self) -> Result<u8, LexerError> {
+    fn next_utf8_char(&mut self) -> Result<char, LexerError> {
+        let mut c = [0u8; 4];
+
+        c[0] = try!(self.next_byte());
+
+        // Lookup table giving the number of bytes for the codepoint
+        // based on bits [7:3] of the first byte. Some values are
+        // invalid but we'll let `str::from_utf8` report the error
+        // (here we pretend that they only need a single byte).
+        let utf8_bytes: [u8; 32] = [
+            // 0b0xxxxxxx
+            1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
+            // 0b10xxxxxx (invalid for a 1st byte)
+            1, 1, 1, 1, 1, 1, 1, 1,
+            // 0b110xxxxx
+            2, 2, 2, 2,
+            // 0b1110xxxx
+            3, 3,
+            // 0b11110xxx
+            4,
+            // 0b11111xxx (invalid)
+            1,
+        ];
+
+        let mut num_bytes = utf8_bytes[(c[0] >> 3) as usize];
+
+        for i in 1..num_bytes {
+            let b =
+                match self.next_byte() {
+                    Ok(b) => b,
+                    Err(LexerError::EndOfFile) => {
+                        // Truncated UTF-8 sequence.
+                        num_bytes = i;
+                        break;
+                    }
+                    Err(e) => return Err(e),
+                };
+
+            c[i as usize] = b;
+        }
+
+        let num_bytes = num_bytes as usize;
+
+        let s = try!(::std::str::from_utf8(&c[0..num_bytes]));
+
+        Ok(s.chars().next().unwrap())
+    }
+
+    fn next_byte(&mut self) -> Result<u8,  LexerError> {
         if self.buffer.len() == self.buffer_offset {
             // Reached the end of the buffer, refill
             let buf_size = 4096;
@@ -94,11 +142,18 @@ enum States {%DECLARE_STATES%
 pub enum LexerError {
     EndOfFile,
     NoMatch(usize),
+    Utf8Error(::std::str::Utf8Error),
     IoError(::std::io::Error),
 }
 
 impl ::std::convert::From<::std::io::Error> for LexerError {
     fn from(e: ::std::io::Error) -> LexerError {
         LexerError::IoError(e)
+    }
+}
+
+impl ::std::convert::From<::std::str::Utf8Error> for LexerError {
+    fn from(e: ::std::str::Utf8Error) -> LexerError {
+        LexerError::Utf8Error(e)
     }
 }

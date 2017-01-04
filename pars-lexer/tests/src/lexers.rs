@@ -13,6 +13,7 @@ fn main() {
     simple();
     intervals();
     intersecting_intervals();
+    utf8();
 }
 
 pub fn simple() {
@@ -123,6 +124,39 @@ pub fn intersecting_intervals() {
     let dfa = Dfa::from_nfa(&nfa);
 
     let outfile = Path::new(&env::var("OUT_DIR").unwrap()).join("intersecting-intervals.rs");
+
+    let mut out = File::create(outfile).unwrap();
+
+    let mut gen = CodeGen::new();
+
+    gen.set_token_type("String");
+
+    gen.generate(&dfa, &mut out).unwrap();
+}
+
+pub fn utf8() {
+    // [a-z]+
+    let mut en = Nfa::new(Interval::new('a', 'z'));
+    en.positive();
+    en.concat(Nfa::new_accepting("english".into()));
+
+    // [a-ya]+
+    let mut ru = Nfa::new(Interval::new('\u{0430}', '\u{044f}'));
+    ru.positive();
+    ru.concat(Nfa::new_accepting("russian".into()));
+
+    // [ ]+
+    let mut spaces = Nfa::new(Interval::new_single(' '));
+    spaces.positive();
+    spaces.concat(Nfa::new_accepting("space".into()));
+
+    let mut nfa = en;
+    nfa.combine(ru);
+    nfa.combine(spaces);
+
+    let dfa = Dfa::from_nfa(&nfa);
+
+    let outfile = Path::new(&env::var("OUT_DIR").unwrap()).join("utf8.rs");
 
     let mut out = File::create(outfile).unwrap();
 
