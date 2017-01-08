@@ -45,6 +45,11 @@ impl State {
     pub fn accepting(&self)-> Option<&String> {
         self.accepting.as_ref()
     }
+
+    /// Return `true` if this is an accepting state
+    pub fn is_accepting(&self) -> bool {
+        self.accepting.is_some()
+    }
 }
 
 pub struct Dfa {
