@@ -30,13 +30,21 @@ pub fn simple() {
     nfa.concat(Nfa::new(b));
     nfa.concat(Nfa::new(b));
 
-    nfa.concat(Nfa::new_accepting("regex (a|b)*abb".into()));
+    nfa.concat(Nfa::new_accepting(stringify!({
+        let m = _lexer_match.as_str().into_owned();
+
+        Some(Token::Abaab(m))
+    }).into()));
 
     // abc
     let mut other = Nfa::new(a);
     other.concat(Nfa::new(b));
     other.concat(Nfa::new(c));
-    other.concat(Nfa::new_accepting("regex abc".into()));
+    other.concat(Nfa::new_accepting(stringify!({
+        let m = _lexer_match.as_str().into_owned();
+
+        Some(Token::Abc(m))
+    }).into()));
 
     nfa.combine(other);
 
@@ -48,7 +56,7 @@ pub fn simple() {
 
     let mut gen = CodeGen::new();
 
-    gen.set_token_type("String");
+    gen.set_token_type("Token");
 
     gen.generate(&dfa, &mut out).unwrap();
 }
@@ -71,12 +79,18 @@ pub fn intervals() {
     alnum.star();
 
     id.concat(alnum);
-    id.concat(Nfa::new_accepting("id".into()));
+    id.concat(Nfa::new_accepting(stringify!({
+        let id = _lexer_match.as_str().into_owned();
+
+        Some(id)
+    }).into()));
 
     // [ ]+
     let mut spaces = Nfa::new(Interval::new_single(' '));
     spaces.positive();
-    spaces.concat(Nfa::new_accepting("space".into()));
+    spaces.concat(Nfa::new_accepting(stringify!({
+        None
+    }).into()));
 
     id.combine(spaces);
 
@@ -96,24 +110,34 @@ pub fn intervals() {
 pub fn intersecting_intervals() {
     let mut az = Nfa::new(Interval::new('a', 'z'));
     az.positive();
-    az.concat(Nfa::new_accepting("az".into()));
+    az.concat(Nfa::new_accepting(stringify!({
+        Some(Token::Az)
+    }).into()));
 
     let mut ae = Nfa::new(Interval::new('a', 'e'));
     ae.positive();
-    ae.concat(Nfa::new_accepting("ae".into()));
+    ae.concat(Nfa::new_accepting(stringify!({
+        Some(Token::Ae)
+    }).into()));
 
     let mut cz = Nfa::new(Interval::new('c', 'z'));
     cz.positive();
-    cz.concat(Nfa::new_accepting("cz".into()));
+    cz.concat(Nfa::new_accepting(stringify!({
+        Some(Token::Cz)
+    }).into()));
 
     let mut bd = Nfa::new(Interval::new('b', 'd'));
     bd.positive();
-    bd.concat(Nfa::new_accepting("bd".into()));
+    bd.concat(Nfa::new_accepting(stringify!({
+        Some(Token::Bd)
+    }).into()));
 
     // [ ]+
     let mut spaces = Nfa::new(Interval::new_single(' '));
     spaces.positive();
-    spaces.concat(Nfa::new_accepting("space".into()));
+    spaces.concat(Nfa::new_accepting(stringify!({
+        None
+    }).into()));
 
     let mut nfa = bd;
     nfa.combine(ae);
@@ -129,7 +153,7 @@ pub fn intersecting_intervals() {
 
     let mut gen = CodeGen::new();
 
-    gen.set_token_type("String");
+    gen.set_token_type("Token");
 
     gen.generate(&dfa, &mut out).unwrap();
 }
@@ -138,17 +162,23 @@ pub fn utf8() {
     // [a-z]+
     let mut en = Nfa::new(Interval::new('a', 'z'));
     en.positive();
-    en.concat(Nfa::new_accepting("english".into()));
+    en.concat(Nfa::new_accepting(stringify!({
+        Some(Token::English)
+    }).into()));
 
     // [a-ya]+
     let mut ru = Nfa::new(Interval::new('\u{0430}', '\u{044f}'));
     ru.positive();
-    ru.concat(Nfa::new_accepting("russian".into()));
+    ru.concat(Nfa::new_accepting(stringify!({
+        Some(Token::Russian)
+    }).into()));
 
     // [ ]+
     let mut spaces = Nfa::new(Interval::new_single(' '));
     spaces.positive();
-    spaces.concat(Nfa::new_accepting("space".into()));
+    spaces.concat(Nfa::new_accepting(stringify!({
+        None
+    }).into()));
 
     let mut nfa = en;
     nfa.combine(ru);
@@ -162,7 +192,7 @@ pub fn utf8() {
 
     let mut gen = CodeGen::new();
 
-    gen.set_token_type("String");
+    gen.set_token_type("Token");
 
     gen.generate(&dfa, &mut out).unwrap();
 }

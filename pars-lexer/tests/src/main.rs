@@ -1,23 +1,30 @@
 mod simple {
     include!(concat!(env!("OUT_DIR"), "/simple.rs"));
 
+    #[derive(Debug, PartialEq, Eq)]
+    pub enum Token {
+        /// (a|b)*abb
+        Abaab(String),
+        /// abc
+        Abc(String),
+    }
+
     #[test]
     fn lex() {
         let mut buf: &[u8] = b"abcbabbababbabc";
 
         let mut lexer = Lexer::new(&mut buf);
 
-        assert_eq!(lexer.next_token().unwrap(), "regex abc".to_owned());
-        assert_eq!(lexer.next_token().unwrap(), "regex (a|b)*abb".to_owned());
-        assert_eq!(lexer.next_token().unwrap(), "regex abc".to_owned());
+        assert_eq!(lexer.next_token().unwrap(),
+                   Some(Token::Abc("abc".into())));
+        assert_eq!(lexer.next_token().unwrap(),
+                   Some(Token::Abaab("babbababb".into())));
+        assert_eq!(lexer.next_token().unwrap(),
+                   Some(Token::Abc("abc".into())));
 
-        match lexer.next_token() {
-            Err(LexerError::EndOfFile) => (),
-            e => panic!("Expected EOF, got {:?}", e),
-        }
+        assert!(lexer.next_token().unwrap().is_none());
     }
 }
-
 
 mod intervals {
     include!(concat!(env!("OUT_DIR"), "/intervals.rs"));
@@ -28,18 +35,14 @@ mod intervals {
 
         let mut lexer = Lexer::new(&mut buf);
 
-        assert_eq!(lexer.next_token().unwrap(), "id".to_owned());
-        assert_eq!(lexer.next_token().unwrap(), "space".to_owned());
-        assert_eq!(lexer.next_token().unwrap(), "id".to_owned());
-        assert_eq!(lexer.next_token().unwrap(), "space".to_owned());
-        assert_eq!(lexer.next_token().unwrap(), "id".to_owned());
-        assert_eq!(lexer.next_token().unwrap(), "space".to_owned());
-        assert_eq!(lexer.next_token().unwrap(), "id".to_owned());
-        assert_eq!(lexer.next_token().unwrap(), "space".to_owned());
-        assert_eq!(lexer.next_token().unwrap(), "id".to_owned());
-        assert_eq!(lexer.next_token().unwrap(), "space".to_owned());
-        assert_eq!(lexer.next_token().unwrap(), "id".to_owned());
-        assert_eq!(lexer.next_token().unwrap(), "space".to_owned());
+        let expected = [
+            "foo", "bar", "aZ", "_AbC12", "a_b_c", "a0_bc",
+        ];
+
+        for &id in &expected {
+            assert_eq!(lexer.next_token().unwrap(),
+                       Some(id.to_owned()));
+        }
 
         match lexer.next_token() {
             Err(LexerError::NoMatch(32)) => (),
@@ -52,26 +55,27 @@ mod intervals {
 mod intersecting_intervals {
     include!(concat!(env!("OUT_DIR"), "/intersecting-intervals.rs"));
 
+    #[derive(Debug, PartialEq, Eq)]
+    pub enum Token {
+        Ae,
+        Bd,
+        Cz,
+        Az
+    }
+
     #[test]
     fn lex() {
         let mut buf: &[u8] = b"abc bcd cde xyz  azerty";
 
         let mut lexer = Lexer::new(&mut buf);
 
-        assert_eq!(lexer.next_token().unwrap(), "ae".to_owned());
-        assert_eq!(lexer.next_token().unwrap(), "space".to_owned());
-        assert_eq!(lexer.next_token().unwrap(), "bd".to_owned());
-        assert_eq!(lexer.next_token().unwrap(), "space".to_owned());
-        assert_eq!(lexer.next_token().unwrap(), "ae".to_owned());
-        assert_eq!(lexer.next_token().unwrap(), "space".to_owned());
-        assert_eq!(lexer.next_token().unwrap(), "cz".to_owned());
-        assert_eq!(lexer.next_token().unwrap(), "space".to_owned());
-        assert_eq!(lexer.next_token().unwrap(), "az".to_owned());
+        assert_eq!(lexer.next_token().unwrap(), Some(Token::Ae));
+        assert_eq!(lexer.next_token().unwrap(), Some(Token::Bd));
+        assert_eq!(lexer.next_token().unwrap(), Some(Token::Ae));
+        assert_eq!(lexer.next_token().unwrap(), Some(Token::Cz));
+        assert_eq!(lexer.next_token().unwrap(), Some(Token::Az));
 
-        match lexer.next_token() {
-            Err(LexerError::EndOfFile) => (),
-            e => panic!("Expected EOF, got {:?}", e),
-        }
+        assert!(lexer.next_token().unwrap().is_none());
     }
 }
 
@@ -79,19 +83,21 @@ mod intersecting_intervals {
 mod utf8 {
     include!(concat!(env!("OUT_DIR"), "/utf8.rs"));
 
+    #[derive(Debug, PartialEq, Eq)]
+    pub enum Token {
+        English,
+        Russian,
+    }
+
     #[test]
     fn lex() {
         let mut buf: &[u8] = "hello привет".as_bytes();
 
         let mut lexer = Lexer::new(&mut buf);
 
-        assert_eq!(lexer.next_token().unwrap(), "english".to_owned());
-        assert_eq!(lexer.next_token().unwrap(), "space".to_owned());
-        assert_eq!(lexer.next_token().unwrap(), "russian".to_owned());
+        assert_eq!(lexer.next_token().unwrap(), Some(Token::English));
+        assert_eq!(lexer.next_token().unwrap(), Some(Token::Russian));
 
-        match lexer.next_token() {
-            Err(LexerError::EndOfFile) => (),
-            e => panic!("Expected EOF, got {:?}", e),
-        }
+        assert!(lexer.next_token().unwrap().is_none());
     }
 }
