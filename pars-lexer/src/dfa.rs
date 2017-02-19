@@ -2,6 +2,7 @@
 
 use nfa::Nfa;
 use std::collections::BTreeMap;
+use std::collections::btree_map::Keys;
 use std::fmt;
 
 use character::Interval;
@@ -34,6 +35,11 @@ impl State {
 
     pub fn move_map(&self) -> &BTreeMap<Interval, usize> {
         &self.moves
+    }
+
+    /// Return the set of intervals for which this state has a move.
+    pub fn move_intervals(&self) -> Keys<Interval, usize> {
+        self.moves.keys()
     }
 
     /// Returns `true` if this state has at least one move on some
@@ -142,8 +148,110 @@ impl Dfa {
 
         // The conversion is done, we can drop the NFA states
         // altogether
-        Dfa {
-            states: dfa_states.into_iter().map(|s| s.dfa_state).collect()
+        let mut dfa =
+            Dfa {
+                states: dfa_states.into_iter().map(|s| s.dfa_state).collect()
+            };
+
+        dfa.optimize();
+
+        dfa
+    }
+
+    /// Optimize the DFA by factoring equivalent states.
+    fn optimize(&mut self) {
+        // First we partition the states to isolate the accepting
+        // states.
+        let mut accepting = Vec::new();
+        let mut non_accepting = Vec::new();
+
+        for (i, s) in self.states.iter().enumerate() {
+            let g =
+                if s.is_accepting() {
+                    &mut accepting
+                } else {
+                    &mut non_accepting
+                };
+
+            g.push(i)
+        }
+
+        let mut partition = vec![accepting, non_accepting];
+
+        let mut needs_loop = true;
+
+        while needs_loop {
+            needs_loop = false;
+
+            let mut next_partition: Vec<Vec<usize>> = Vec::new();
+            let mut subgroup_start;
+
+            for group in &partition {
+
+                subgroup_start = next_partition.len();
+
+                for &state_idx in group {
+                    let state = &self.states[state_idx];
+
+                    // See if this state fits in any of our current
+                    // subgroups
+                    let mut found_equiv = false;
+
+                    for sub in &mut next_partition[subgroup_start..] {
+                        // Pick the first state in the subgroup as a
+                        // representative
+                        let &s = sub.first().unwrap();
+
+                        let sub_state = &self.states[s];
+
+                        let equivalent =
+                            if sub_state.move_intervals().ne(state.move_intervals()) {
+                                false
+                            } else {
+                                let mut equivalent = true;
+
+                                // Both states move on the same keys, they
+                                // could be equivalent
+                                for (i, &s) in sub_state.move_map() {
+                                    println!("Looking for {:?}", i);
+                                    let other = state.move_map()[i];
+
+                                    // XXX fixme
+                                    if other != s {
+                                        equivalent = false;
+                                        break;
+                                    }
+                                }
+
+                                equivalent
+                            };
+
+                        if equivalent {
+                            // We can push to this subgroup
+                            sub.push(state_idx);
+                            found_equiv = true;
+                            break;
+                        }
+                    }
+
+                    if !found_equiv {
+                        // Looks like we need a new subgroup
+                        next_partition.push(vec![state_idx]);
+                    }
+                }
+            }
+
+            needs_loop = partition.len() != next_partition.len();
+
+            partition = next_partition
+        }
+
+
+        for p in partition {
+            println!("Partition:");
+            for i in p {
+                println!("{}", i);
+            }
         }
     }
 
