@@ -7,6 +7,7 @@ use std::fmt;
 
 use character::Interval;
 
+#[derive(Clone)]
 pub struct State {
     moves: BTreeMap<Interval, usize>,
     accepting: Option<String>,
@@ -35,6 +36,10 @@ impl State {
 
     pub fn move_map(&self) -> &BTreeMap<Interval, usize> {
         &self.moves
+    }
+
+    pub fn move_map_mut(&mut self) -> &mut BTreeMap<Interval, usize> {
+        &mut self.moves
     }
 
     /// Return the set of intervals for which this state has a move.
@@ -176,13 +181,18 @@ impl Dfa {
             g.push(i)
         }
 
-        let mut partition = vec![accepting, non_accepting];
+        let mut partition = vec![non_accepting, accepting];
 
-        let mut needs_loop = true;
+        println!("optimize");
 
-        while needs_loop {
-            needs_loop = false;
+        for p in &partition {
+            println!("Partition:");
+            for i in p {
+                println!("{}", i);
+            }
+        }
 
+        loop {
             let mut next_partition: Vec<Vec<usize>> = Vec::new();
             let mut subgroup_start;
 
@@ -208,18 +218,30 @@ impl Dfa {
                             if sub_state.move_intervals().ne(state.move_intervals()) {
                                 false
                             } else {
+                                // Both states move on the same keys,
+                                // they could be equivalent
                                 let mut equivalent = true;
 
-                                // Both states move on the same keys, they
-                                // could be equivalent
-                                for (i, &s) in sub_state.move_map() {
-                                    println!("Looking for {:?}", i);
+                                 for (i, &s) in sub_state.move_map() {
                                     let other = state.move_map()[i];
 
-                                    // XXX fixme
                                     if other != s {
-                                        equivalent = false;
-                                        break;
+                                        // We have a different
+                                        // transition but there's
+                                        // still hope: if we move to a
+                                        // state in the same partition
+                                        // then we can still consider
+                                        // the states as equivalent.
+                                        for p in &partition {
+                                            if p.iter().any(|&i| i == s) {
+                                                equivalent = p.iter().any(|&i| i == other);
+                                                break;
+                                            }
+                                        }
+
+                                        if !equivalent {
+                                            break;
+                                        }
                                     }
                                 }
 
@@ -241,18 +263,46 @@ impl Dfa {
                 }
             }
 
-            needs_loop = partition.len() != next_partition.len();
+            let done = partition.len() == next_partition.len();
 
-            partition = next_partition
-        }
+            partition = next_partition;
 
+            println!("dump");
 
-        for p in partition {
-            println!("Partition:");
-            for i in p {
-                println!("{}", i);
+            for p in &partition {
+                println!("Partition:");
+                for i in p {
+                    println!("{}", i);
+                }
+            }
+
+            if done {
+                break;
             }
         }
+
+        // At this point all the states within a partition should be
+        // equivalent and we can factor them by retaining a single
+        // group per state.
+        let optimized: Vec<_> = partition.iter().map(|p| {
+            // Keep only the first state in the partition
+            let mut s = self.states[p[0]].clone();
+
+            // Rewrite the move map to point to the correct partition
+            for s in s.move_map_mut().values_mut() {
+                for (pos, p) in partition.iter().enumerate() {
+                    if p.iter().any(|&i| i == *s) {
+                        *s = pos;
+                        break;
+                    }
+                }
+            }
+
+            s
+        }).collect();
+
+
+        self.states = optimized;
     }
 
     /// In order for the DFA to be deterministic we must have exactly

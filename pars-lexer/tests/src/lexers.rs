@@ -96,10 +96,6 @@ pub fn intervals() {
 
     let dfa = Dfa::from_nfa(&id);
 
-    println!("{:?}", dfa);
-
-    panic!();
-
     let outfile = Path::new(&env::var("OUT_DIR").unwrap()).join("intervals.rs");
 
     let mut out = File::create(outfile).unwrap();
