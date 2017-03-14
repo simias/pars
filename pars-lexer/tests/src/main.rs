@@ -110,7 +110,7 @@ mod c_basic {
         Id(String),
         Symbol(String),
         Number(i64),
-    }    
+    }
 
     #[test]
     fn lex() {
@@ -120,8 +120,8 @@ mod c_basic {
             b"int main() {                                  \
                 int i;                                      \
                                                             \
-                for (i = 0; i < 10; i++) {                  \
-                  printf(\"Hello, world %d\\n\", i + 2);    \
+                for (i = 0; i <= 10; i++) {                 \
+                  printf(FMT, i + 2);                       \
                 }                                           \
               }";
 
@@ -141,7 +141,7 @@ mod c_basic {
             Number(0),
             Symbol(";".into()),
             Id("i".into()),
-            Symbol("<".into()),
+            Symbol("<=".into()),
             Number(10),
             Symbol(";".into()),
             Id("i".into()),
@@ -150,17 +150,23 @@ mod c_basic {
             Symbol("{".into()),
             Id("printf".into()),
             Symbol("(".into()),
+            Id("FMT".into()),
+            Symbol(",".into()),
+            Id("i".into()),
+            Symbol("+".into()),
+            Number(2),
+            Symbol(")".into()),
+            Symbol(";".into()),
+            Symbol("}".into()),
+            Symbol("}".into()),
         ];
 
         let mut lexer = Lexer::new(&mut buf);
 
-        for t in &expected {
+        for t in expected.iter() {
             assert_eq!(lexer.next_token().unwrap(), Some(t.clone()));
         }
 
-        match lexer.next_token() {
-            Err(LexerError::EndOfFile) => (),
-            e => panic!("Expected EOF, got {:?}", e),
-        }
+        assert!(lexer.next_token().unwrap().is_none());
     }
 }

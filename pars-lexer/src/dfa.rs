@@ -7,6 +7,10 @@ use std::fmt;
 
 use character::Interval;
 
+pub struct Dfa {
+    states: Vec<State>,
+}
+
 #[derive(Clone)]
 pub struct State {
     moves: BTreeMap<Interval, usize>,
@@ -61,10 +65,6 @@ impl State {
     pub fn is_accepting(&self) -> bool {
         self.accepting.is_some()
     }
-}
-
-pub struct Dfa {
-    states: Vec<State>,
 }
 
 impl Dfa {
@@ -167,30 +167,30 @@ impl Dfa {
     fn optimize(&mut self) {
         // First we partition the states to isolate the accepting
         // states.
-        let mut accepting = Vec::new();
-        let mut non_accepting = Vec::new();
+        let mut partition: Vec<Vec<usize>> = Vec::new();
 
         for (i, s) in self.states.iter().enumerate() {
-            let g =
-                if s.is_accepting() {
-                    &mut accepting
-                } else {
-                    &mut non_accepting
-                };
 
-            g.push(i)
-        }
+            let mut found = false;
 
-        let mut partition = vec![non_accepting, accepting];
+            // See if we already have a partition with the same accepting
+            // state
+            for p in partition.iter_mut() {
 
-        println!("optimize");
+                if self.states[p[0]].accepting() == s.accepting() {
+                    p.push(i);
+                    found = true;
+                    break;
+                }
+            }
 
-        for p in &partition {
-            println!("Partition:");
-            for i in p {
-                println!("{}", i);
+            if !found {
+                // New partition
+                partition.push(vec![i]);
             }
         }
+
+        println!("optimize");
 
         loop {
             let mut next_partition: Vec<Vec<usize>> = Vec::new();
@@ -267,17 +267,15 @@ impl Dfa {
 
             partition = next_partition;
 
-            println!("dump");
-
-            for p in &partition {
-                println!("Partition:");
-                for i in p {
-                    println!("{}", i);
-                }
-            }
-
             if done {
                 break;
+            }
+        }
+
+        for p in &partition {
+            println!("Partition:");
+            for i in p {
+                println!("{}", i);
             }
         }
 

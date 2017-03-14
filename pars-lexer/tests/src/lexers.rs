@@ -240,11 +240,11 @@ pub fn c_basic() {
     }).into()));
 
     // "[^"]*"
-    let quote = Interval::new_single('"');
+    //let quote = Interval::new_single('"');
 
-    let mut not_quote = Nfa::new_complement(quote.complement())
+    //let mut not_quote = Nfa::new_complement(quote.complement());
 
-    let mut string = Nfa::new(quote);
+    //let mut string = Nfa::new(quote);
 
     
 
