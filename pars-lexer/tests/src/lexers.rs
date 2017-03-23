@@ -14,6 +14,7 @@ fn main() {
     intervals();
     intersecting_intervals();
     utf8();
+    c_basic();
 }
 
 pub fn simple() {
@@ -187,6 +188,161 @@ pub fn utf8() {
     let dfa = Dfa::from_nfa(&nfa);
 
     let outfile = Path::new(&env::var("OUT_DIR").unwrap()).join("utf8.rs");
+
+    let mut out = File::create(outfile).unwrap();
+
+    let mut gen = CodeGen::new();
+
+    gen.set_token_type("Token");
+
+    gen.generate(&dfa, &mut out).unwrap();
+}
+
+pub fn c_basic() {
+    let lower = Nfa::new(Interval::new('a', 'z'));
+    let upper = Nfa::new(Interval::new('A', 'Z'));
+    let num   = Nfa::new(Interval::new('0', '9'));
+    let under = Nfa::new(Interval::new_single('_'));
+
+    // [0-9]+
+    let mut number = num.clone();
+    number.positive();
+    number.concat(Nfa::new_accepting(stringify!({
+        use std::str::FromStr;
+
+        let n = i64::from_str(&_lexer_match.as_str()).unwrap();
+
+        Some(Token::Number(n))
+    }).into()));
+
+    // [a-zA-Z_][a-zA-Z_0-9]*
+    let mut id = lower.clone();
+    id.union(upper.clone());
+    id.union(under.clone());
+
+    let mut rest = id.clone();
+    rest.union(num);
+    rest.star();
+
+    id.concat(rest);
+    id.concat(Nfa::new_accepting(stringify!({
+        let id = _lexer_match.as_str().into_owned();
+        Some(Token::Id(id))
+    }).into()));
+
+    // [ \t\n]+
+    let mut spaces = Nfa::new(Interval::new_single(' '));
+    spaces.union(Nfa::new(Interval::new_single('\t')));
+    spaces.union(Nfa::new(Interval::new_single('\n')));
+    spaces.positive();
+    spaces.concat(Nfa::new_accepting(stringify!({
+        None
+    }).into()));
+
+    fn symbol(s: &str) -> Nfa {
+        let mut nfa = Nfa::new_empty();
+
+        for c in s.chars() {
+            nfa.concat(Nfa::new(Interval::new_single(c)));
+        }
+
+        nfa.concat(Nfa::new_accepting(stringify!({
+            let s = _lexer_match.as_str().into_owned();
+            Some(Token::Symbol(s))
+        }).into()));
+
+        nfa
+    }
+
+    let mut nfa = spaces;
+    nfa.combine(symbol("auto"));
+    nfa.combine(symbol("break"));
+    nfa.combine(symbol("case"));
+    nfa.combine(symbol("char"));
+    nfa.combine(symbol("const"));
+    nfa.combine(symbol("continue"));
+    nfa.combine(symbol("default"));
+    nfa.combine(symbol("do"));
+    nfa.combine(symbol("double"));
+    nfa.combine(symbol("else"));
+    nfa.combine(symbol("enum"));
+    nfa.combine(symbol("extern"));
+    nfa.combine(symbol("float"));
+    nfa.combine(symbol("for"));
+    nfa.combine(symbol("goto"));
+    nfa.combine(symbol("if"));
+    nfa.combine(symbol("int"));
+    nfa.combine(symbol("long"));
+    nfa.combine(symbol("register"));
+    nfa.combine(symbol("return"));
+    nfa.combine(symbol("short"));
+    nfa.combine(symbol("signed"));
+    nfa.combine(symbol("sizeof"));
+    nfa.combine(symbol("static"));
+    nfa.combine(symbol("struct"));
+    nfa.combine(symbol("switch"));
+    nfa.combine(symbol("typedef"));
+    nfa.combine(symbol("union"));
+    nfa.combine(symbol("unsigned"));
+    nfa.combine(symbol("void"));
+    nfa.combine(symbol("volatile"));
+    nfa.combine(symbol("while"));
+    nfa.combine(symbol("..."));
+    nfa.combine(symbol(">>="));
+    nfa.combine(symbol("<<="));
+    nfa.combine(symbol("+="));
+    nfa.combine(symbol("-="));
+    nfa.combine(symbol("*="));
+    nfa.combine(symbol("/="));
+    nfa.combine(symbol("%="));
+    nfa.combine(symbol("&="));
+    nfa.combine(symbol("^="));
+    nfa.combine(symbol("|="));
+    nfa.combine(symbol(">>"));
+    nfa.combine(symbol("<<"));
+    nfa.combine(symbol("++"));
+    nfa.combine(symbol("--"));
+    nfa.combine(symbol("->"));
+    nfa.combine(symbol("&&"));
+    nfa.combine(symbol("||"));
+    nfa.combine(symbol("<="));
+    nfa.combine(symbol(">="));
+    nfa.combine(symbol("=="));
+    nfa.combine(symbol("!="));
+    nfa.combine(symbol(";"));
+    nfa.combine(symbol("{"));
+    nfa.combine(symbol("<%"));
+    nfa.combine(symbol("}"));
+    nfa.combine(symbol("%>"));
+    nfa.combine(symbol(","));
+    nfa.combine(symbol(":"));
+    nfa.combine(symbol("="));
+    nfa.combine(symbol("("));
+    nfa.combine(symbol(")"));
+    nfa.combine(symbol("["));
+    nfa.combine(symbol("<:"));
+    nfa.combine(symbol("]"));
+    nfa.combine(symbol(":>"));
+    nfa.combine(symbol("."));
+    nfa.combine(symbol("&"));
+    nfa.combine(symbol("!"));
+    nfa.combine(symbol("~"));
+    nfa.combine(symbol("-"));
+    nfa.combine(symbol("+"));
+    nfa.combine(symbol("*"));
+    nfa.combine(symbol("/"));
+    nfa.combine(symbol("%"));
+    nfa.combine(symbol("<"));
+    nfa.combine(symbol(">"));
+    nfa.combine(symbol("^"));
+    nfa.combine(symbol("|"));
+    nfa.combine(symbol("?"));
+    nfa.combine(number);
+    nfa.combine(id);
+
+    let dfa = Dfa::from_nfa(&nfa);
+
+    let outfile = Path::new(&env::var("OUT_DIR").unwrap()).join("c-basic.rs");
 
     let mut out = File::create(outfile).unwrap();
 

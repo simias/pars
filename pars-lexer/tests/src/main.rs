@@ -101,3 +101,72 @@ mod utf8 {
         assert!(lexer.next_token().unwrap().is_none());
     }
 }
+
+mod c_basic {
+    include!(concat!(env!("OUT_DIR"), "/c-basic.rs"));
+
+    #[derive(Debug, PartialEq, Eq, Clone)]
+    pub enum Token {
+        Id(String),
+        Symbol(String),
+        Number(i64),
+    }
+
+    #[test]
+    fn lex() {
+        use self::Token::*;
+
+        let mut buf: &[u8] =
+            b"int main() {                                  \
+                int i;                                      \
+                                                            \
+                for (i = 0; i <= 10; i++) {                 \
+                  printf(FMT, i + 2);                       \
+                }                                           \
+              }";
+
+        let expected = [
+            Symbol("int".into()),
+            Id("main".into()),
+            Symbol("(".into()),
+            Symbol(")".into()),
+            Symbol("{".into()),
+            Symbol("int".into()),
+            Id("i".into()),
+            Symbol(";".into()),
+            Symbol("for".into()),
+            Symbol("(".into()),
+            Id("i".into()),
+            Symbol("=".into()),
+            Number(0),
+            Symbol(";".into()),
+            Id("i".into()),
+            Symbol("<=".into()),
+            Number(10),
+            Symbol(";".into()),
+            Id("i".into()),
+            Symbol("++".into()),
+            Symbol(")".into()),
+            Symbol("{".into()),
+            Id("printf".into()),
+            Symbol("(".into()),
+            Id("FMT".into()),
+            Symbol(",".into()),
+            Id("i".into()),
+            Symbol("+".into()),
+            Number(2),
+            Symbol(")".into()),
+            Symbol(";".into()),
+            Symbol("}".into()),
+            Symbol("}".into()),
+        ];
+
+        let mut lexer = Lexer::new(&mut buf);
+
+        for t in expected.iter() {
+            assert_eq!(lexer.next_token().unwrap(), Some(t.clone()));
+        }
+
+        assert!(lexer.next_token().unwrap().is_none());
+    }
+}
