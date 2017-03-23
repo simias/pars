@@ -158,6 +158,9 @@ impl Dfa {
                 states: dfa_states.into_iter().map(|s| s.dfa_state).collect()
             };
 
+        // XXX before optimizing the DFA we could attempt to merge
+        // contiguous intervals to potentially detect more redundant
+        // states.
         dfa.optimize();
 
         dfa
@@ -190,8 +193,6 @@ impl Dfa {
             }
         }
 
-        println!("optimize");
-
         loop {
             let mut next_partition: Vec<Vec<usize>> = Vec::new();
             let mut subgroup_start;
@@ -214,39 +215,46 @@ impl Dfa {
 
                         let sub_state = &self.states[s];
 
-                        let equivalent =
-                            if sub_state.move_intervals().ne(state.move_intervals()) {
-                                false
-                            } else {
-                                // Both states move on the same keys,
-                                // they could be equivalent
-                                let mut equivalent = true;
+                        // Check if both states move on the same
+                        // intervals. If it's not the case we can
+                        // directly assume that they belong to
+                        // different partitions.
+                        let mut equivalent =
+                            sub_state.move_intervals()
+                            .eq(state.move_intervals());
 
-                                 for (i, &s) in sub_state.move_map() {
-                                    let other = state.move_map()[i];
+                        if equivalent {
+                            // Both states move on the same keys,
+                            // they could be equivalent
+                            for (i, &s) in sub_state.move_map() {
+                                let other = state.move_map()[i];
 
-                                    if other != s {
-                                        // We have a different
-                                        // transition but there's
-                                        // still hope: if we move to a
-                                        // state in the same partition
-                                        // then we can still consider
-                                        // the states as equivalent.
-                                        for p in &partition {
-                                            if p.iter().any(|&i| i == s) {
-                                                equivalent = p.iter().any(|&i| i == other);
-                                                break;
-                                            }
-                                        }
+                                if other == s {
+                                    continue;
+                                }
 
-                                        if !equivalent {
-                                            break;
-                                        }
+                                // We have a different transition but
+                                // there's still hope: if we move to a
+                                // state in the same partition then we
+                                // can still consider the states as
+                                // equivalent.
+                                for p in &partition {
+                                    // Check if the target of both
+                                    // moves land in the same
+                                    // partition
+                                    if p.iter().any(|&i| i == s) {
+                                        equivalent =
+                                            p.iter()
+                                            .any(|&i| i == other);
+                                        break;
                                     }
                                 }
 
-                                equivalent
-                            };
+                                if !equivalent {
+                                    break;
+                                }
+                            }
+                        };
 
                         if equivalent {
                             // We can push to this subgroup
@@ -269,13 +277,6 @@ impl Dfa {
 
             if done {
                 break;
-            }
-        }
-
-        for p in &partition {
-            println!("Partition:");
-            for i in p {
-                println!("{}", i);
             }
         }
 
