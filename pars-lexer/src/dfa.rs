@@ -2,10 +2,16 @@
 
 use nfa::Nfa;
 use std::collections::BTreeMap;
+use std::collections::btree_map::Keys;
 use std::fmt;
 
 use character::Interval;
 
+pub struct Dfa {
+    states: Vec<State>,
+}
+
+#[derive(Clone)]
 pub struct State {
     moves: BTreeMap<Interval, usize>,
     accepting: Option<String>,
@@ -36,6 +42,15 @@ impl State {
         &self.moves
     }
 
+    pub fn move_map_mut(&mut self) -> &mut BTreeMap<Interval, usize> {
+        &mut self.moves
+    }
+
+    /// Return the set of intervals for which this state has a move.
+    pub fn move_intervals(&self) -> Keys<Interval, usize> {
+        self.moves.keys()
+    }
+
     /// Returns `true` if this state has at least one move on some
     /// input.
     pub fn has_moves(&self) -> bool {
@@ -50,10 +65,6 @@ impl State {
     pub fn is_accepting(&self) -> bool {
         self.accepting.is_some()
     }
-}
-
-pub struct Dfa {
-    states: Vec<State>,
 }
 
 impl Dfa {
@@ -142,9 +153,155 @@ impl Dfa {
 
         // The conversion is done, we can drop the NFA states
         // altogether
-        Dfa {
-            states: dfa_states.into_iter().map(|s| s.dfa_state).collect()
+        let mut dfa =
+            Dfa {
+                states: dfa_states.into_iter().map(|s| s.dfa_state).collect()
+            };
+
+        // XXX before optimizing the DFA we could attempt to merge
+        // contiguous intervals to potentially detect more redundant
+        // states.
+        dfa.optimize();
+
+        dfa
+    }
+
+    /// Optimize the DFA by factoring equivalent states.
+    fn optimize(&mut self) {
+        // First we partition the states to isolate the accepting
+        // states.
+        let mut partition: Vec<Vec<usize>> = Vec::new();
+
+        for (i, s) in self.states.iter().enumerate() {
+
+            let mut found = false;
+
+            // See if we already have a partition with the same accepting
+            // state
+            for p in partition.iter_mut() {
+
+                if self.states[p[0]].accepting() == s.accepting() {
+                    p.push(i);
+                    found = true;
+                    break;
+                }
+            }
+
+            if !found {
+                // New partition
+                partition.push(vec![i]);
+            }
         }
+
+        loop {
+            let mut next_partition: Vec<Vec<usize>> = Vec::new();
+            let mut subgroup_start;
+
+            for group in &partition {
+
+                subgroup_start = next_partition.len();
+
+                for &state_idx in group {
+                    let state = &self.states[state_idx];
+
+                    // See if this state fits in any of our current
+                    // subgroups
+                    let mut found_equiv = false;
+
+                    for sub in &mut next_partition[subgroup_start..] {
+                        // Pick the first state in the subgroup as a
+                        // representative
+                        let &s = sub.first().unwrap();
+
+                        let sub_state = &self.states[s];
+
+                        // Check if both states move on the same
+                        // intervals. If it's not the case we can
+                        // directly assume that they belong to
+                        // different partitions.
+                        let mut equivalent =
+                            sub_state.move_intervals()
+                            .eq(state.move_intervals());
+
+                        if equivalent {
+                            // Both states move on the same keys,
+                            // they could be equivalent
+                            for (i, &s) in sub_state.move_map() {
+                                let other = state.move_map()[i];
+
+                                if other == s {
+                                    continue;
+                                }
+
+                                // We have a different transition but
+                                // there's still hope: if we move to a
+                                // state in the same partition then we
+                                // can still consider the states as
+                                // equivalent.
+                                for p in &partition {
+                                    // Check if the target of both
+                                    // moves land in the same
+                                    // partition
+                                    if p.iter().any(|&i| i == s) {
+                                        equivalent =
+                                            p.iter()
+                                            .any(|&i| i == other);
+                                        break;
+                                    }
+                                }
+
+                                if !equivalent {
+                                    break;
+                                }
+                            }
+                        };
+
+                        if equivalent {
+                            // We can push to this subgroup
+                            sub.push(state_idx);
+                            found_equiv = true;
+                            break;
+                        }
+                    }
+
+                    if !found_equiv {
+                        // Looks like we need a new subgroup
+                        next_partition.push(vec![state_idx]);
+                    }
+                }
+            }
+
+            let done = partition.len() == next_partition.len();
+
+            partition = next_partition;
+
+            if done {
+                break;
+            }
+        }
+
+        // At this point all the states within a partition should be
+        // equivalent and we can factor them by retaining a single
+        // group per state.
+        let optimized: Vec<_> = partition.iter().map(|p| {
+            // Keep only the first state in the partition
+            let mut s = self.states[p[0]].clone();
+
+            // Rewrite the move map to point to the correct partition
+            for s in s.move_map_mut().values_mut() {
+                for (pos, p) in partition.iter().enumerate() {
+                    if p.iter().any(|&i| i == *s) {
+                        *s = pos;
+                        break;
+                    }
+                }
+            }
+
+            s
+        }).collect();
+
+
+        self.states = optimized;
     }
 
     /// In order for the DFA to be deterministic we must have exactly
